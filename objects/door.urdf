@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- This URDF was automatically created by SolidWorks to URDF Exporter! Originally created by Stephen Brawner (brawner@gmail.com) 
+     Commit Version: 1.6.0-1-g15f4949  Build Version: 1.6.7594.29634
+     For more information, please see http://wiki.ros.org/sw_urdf_exporter -->
+<robot
+  name="door">
+  <link
+    name="base_link">
+    <inertial>
+      <origin
+        xyz="-0.00035856 -6.81E-05 0.30204"
+        rpy="0 0 0" />
+      <mass
+        value="2.168" />
+      <inertia
+        ixx="0.077355"
+        ixy="-2.2905E-05"
+        ixz="-3.9675E-05"
+        iyy="0.13908"
+        iyz="-7.5353E-06"
+        izz="0.062634" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://bopt_gmm/objects/door/base_link.STL" />
+      </geometry>
+      <material
+        name="oak">
+        <color
+          rgba="0.5 0.37 0.2 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://bopt_gmm/objects/door/base_link_collision.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <link
+    name="door_link">
+    <inertial>
+      <origin
+        xyz="0.1541 0.25 -0.024928"
+        rpy="0 0 0" />
+      <mass
+        value="3.354" />
+      <inertia
+        ixx="0.070642"
+        ixy="-2.8091E-19"
+        ixz="3.5445E-05"
+        iyy="0.025702"
+        iyz="7.7165E-20"
+        izz="0.095441" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://bopt_gmm/objects/door/door_link.STL" />
+      </geometry>
+      <material
+        name="oak">
+        <color
+          rgba="0.5 0.37 0.2 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://bopt_gmm/objects/door/door_link_collision.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="base__door"
+    type="revolute">
+    <origin
+      xyz="-0.1555 -0.03 0.001"
+      rpy="1.5708 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="door_link" />
+    <axis
+      xyz="0 -1 0" />
+    <limit
+      lower="0"
+      upper="1.5708"
+      effort="1"
+      velocity="1" />
+  </joint>
+  <link concave='yes'
+    name="handle_link">
+    <inertial>
+      <origin
+        xyz="0.026404 -0.01 0.011738"
+        rpy="0 0 0" />
+      <mass
+        value="0.56914" />
+      <inertia
+        ixx="0.00061276"
+        ixy="-5.727E-20"
+        ixz="-0.00047573"
+        iyy="0.0012992"
+        iyz="-8.6141E-20"
+        izz="0.00072869" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://bopt_gmm/objects/door/handle_link.STL" />
+      </geometry>
+      <material
+        name="stainless steel">
+        <color
+          rgba="0.77647 0.75686 0.73725 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh concave='yes'
+          filename="package://bopt_gmm/objects/door/handle_link_collision.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="door__handle"
+    type="revolute">
+    <origin
+      xyz="0.255 0.24 0"
+      rpy="0 0 3.1416" />
+    <parent
+      link="door_link" />
+    <child
+      link="handle_link" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="0"
+      upper="0.7854"
+      effort="1"
+      velocity="1" />
+  </joint>
+</robot>

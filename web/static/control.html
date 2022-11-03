@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Gym Tacto Peg Control</title>
+    <script src="https://cdn.socket.io/3.1.3/socket.io.min.js"
+        integrity="sha384-cPwlPLvBTa3sKAgddT6krw0cJat7egBga3DJepJyrLl4Q9/5WLra3rrnMcyTyOnh"
+        crossorigin="anonymous"></script>
+</head>
+
+<body>
+    <p>Use
+    <ul>
+        <li>W, A, S, D to move the robot's end effector in the XY plane</li>
+        <li>Q upwards and E downwards in the Z direction</li>
+        <li>U rot neg z, I rot pos z (yaw)</li>
+        <li>R to reset the scene</li>
+        <li>Enter to quit the application</li>
+    </ul>.
+    </p>
+
+    <p>You can also attach a gamepad, or press a key on one that you have connected.
+    <ul id="gamePadInfo" style="display: none;">
+        <li>Right stick to move in the XY plane.</li>
+        <li>Left stick to move along the Z axis and rotate.</li>
+        <li>Circle/B to reset.</li>
+        <li>Triangle/Y to quit.</li>
+    </ul>
+    </p>
+</body>
+
+<script>
+    const socket = io();
+
+    const validKeys = ['KeyA', 'KeyS', 'KeyD', 'KeyW', 'KeyQ', 'KeyE', 'KeyU', 'KeyI',
+        'KeyR', 'Enter'];
+    const activeKeys = validKeys.reduce((map, key) => { map[key] = false; return map; }, {});
+
+    const deadzone = 0.1;
+    const f_deadzone = 1.0 - deadzone;
+
+    document.body.onkeydown = document.body.onkeyup = (ev) => {
+        if (validKeys.findIndex(x => ev.code == x) != -1) {
+            console.log(ev.code)
+            activeKeys[ev.code] = ev.type == 'keydown';
+        }
+    };
+
+    var gamepad = null;
+
+    window.addEventListener('gamepadconnected', (e) => {
+        if (gamepad !== null)
+            return;
+
+        gamepad = e.gamepad;
+        document.getElementById('gamePadInfo').style.display = 'block';
+    });
+
+    window.addEventListener('gamepaddisconnected', (e) => {
+        if (gamepad === null || gamepad.index != e.gamepad.index)
+            return;
+
+        gamepad = null;
+        document.getElementById('gamePadInfo').style.display = 'none';
+    });
+
+    var button_reset_pressed = false;
+    var button_save_pressed = false;
+    var button_quit_pressed = false;
+
+    // 50 Hz update
+    setInterval(() => {
+        let x = -1.0 * activeKeys['KeyA'] + 1.0 * activeKeys['KeyD'];
+        let y = -1.0 * activeKeys['KeyS'] + 1.0 * activeKeys['KeyW'];
+        let z = -1.0 * activeKeys['KeyE'] + 1.0 * activeKeys['KeyQ'];
+        let yaw = -1.0 * activeKeys['KeyU'] + 1.0 * activeKeys['KeyI'];
+
+
+        let save = activeKeys['KeyT'];
+        let reset = activeKeys['KeyR'];
+        let quit = activeKeys['Enter'];
+
+        gamepads = navigator.getGamepads();
+        if (gamepads.length > 0) {
+            gamepad = gamepads[0];
+        } else {
+            gamepad = null;
+        }
+
+        if (gamepad) {
+            // var btnString = '';
+            // for (let i = 0; i < gamepad.buttons.length; i++) {
+            //     btnString += `button ${i}: ${gamepad.buttons[i].pressed} `;
+            // }
+            // document.getElementById('buttons').innerHTML = btnString;
+
+            // var axesString = '';
+            // for (let i = 0; i < gamepad.axes.length; i++) {
+            //     axesString += `axis ${i}: ${gamepad.axes[i].toFixed(4)} `;
+            // }
+
+            ax_x = Math.sign(gamepad.axes[2]) * Math.max(Math.abs(gamepad.axes[2]) - deadzone, 0.0) / f_deadzone
+            ax_y = Math.sign(gamepad.axes[3]) * Math.max(Math.abs(gamepad.axes[3]) - deadzone, 0.0) / f_deadzone
+            ax_z = Math.sign(gamepad.axes[1]) * Math.max(Math.abs(gamepad.axes[1]) - deadzone, 0.0) / f_deadzone
+
+            x += ax_x;
+            y -= ax_y;
+            z -= ax_z;
+            yaw -= gamepad.axes[0];
+
+            save = save || (gamepad.buttons[0].pressed && !button_save_pressed);
+            reset = reset || (gamepad.buttons[1].pressed && !button_reset_pressed);
+            quit = quit || (gamepad.buttons[3].pressed && !button_quit_pressed);
+
+            // console.log(`Reset: ${reset} Quit: ${quit} Save: ${save}`)
+
+            button_save_pressed = gamepad.buttons[0].pressed;
+            button_reset_pressed = gamepad.buttons[1].pressed;
+            button_quit_pressed = gamepad.buttons[3].pressed;
+        }
+
+        if (x != 0.0 || y != 0.0 || z != 0.0 || yaw != 0.0 ||
+            quit || reset || save) {
+            msg = {
+                x: x, y: y, z: z, yaw: yaw,
+                shutdown: quit, reset: reset, save: save
+            };
+            socket.emit('command', msg);
+            console.log(msg)
+        }
+    }, 20); 
+</script>
+
+</html>

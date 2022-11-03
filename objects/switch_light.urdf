@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="utf-8"?>
+<robot
+  name="switch_light">
+  <link concave="yes"
+    name="base_link">
+    <inertial>
+      <origin
+        xyz="-2.7590207171523E-18 0.0593633246412344 -0.041987093619272"
+        rpy="0 0 0" />
+      <mass
+        value="7.87635033702108" />
+      <inertia
+        ixx="0.143768340807969"
+        ixy="-7.20625531864753E-20"
+        ixz="7.1348048857746E-18"
+        iyy="0.160653442958459"
+        iyz="0.010384838827874"
+        izz="0.0325219588960975" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://bopt_gmm/objects/switch_light/base_link.obj" />
+      </geometry>
+      <material
+        name="white">
+        <color
+          rgba="1. 1. 1. 1" />
+      </material>
+    </visual>
+    <collision concave="yes">
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://bopt_gmm/objects/switch_light/base_link.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <link
+    name="handle_link">
+    <inertial>
+      <origin
+        xyz="-2.06812359691662E-17 0.0592752102021964 0.0125"
+        rpy="0 0 0" />
+      <mass
+        value="0.166433988976162" />
+      <inertia
+        ixx="0.000150092643738413"
+        ixy="3.67874334556128E-20"
+        ixz="-7.84787606159685E-20"
+        iyy="0.000323185902762264"
+        iyz="2.04659443790015E-21"
+        izz="0.000456794518176314" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://bopt_gmm/objects/switch_light/handle_link.obj" />
+      </geometry>
+      <material
+        name="red">
+        <color
+          rgba="1 0 0 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://bopt_gmm/objects/switch_light/handle_link_vhacd2.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="base__handle"
+    type="prismatic">
+    <origin
+      xyz="0 -0.15 0.025"
+      rpy="1.5707963267949 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="handle_link" />
+    <axis
+      xyz="0 0 -1" />
+    <limit
+      lower="0"
+      upper="0.2"
+      effort="0"
+      velocity="0" />
+  </joint>
+  <link
+    name="light_link">
+    <inertial>
+      <origin
+        xyz="-8.65150682881562E-19 0.0870635790947573 0"
+        rpy="0 0 0" />
+      <mass
+        value="0.641726447217232" />
+      <inertia
+        ixx="0.00105573280349985"
+        ixy="8.83670027371603E-21"
+        ixz="4.78335534564133E-37"
+        iyy="0.000567898531852214"
+        iyz="1.39689666208673E-20"
+        izz="0.00105573280349985" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://bopt_gmm/objects/switch_light/light_link.STL" />
+      </geometry>
+      <material
+        name="white">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://bopt_gmm/objects/switch_light/light_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="base__light"
+    type="fixed">
+    <origin
+      xyz="0 0.175 0.125"
+      rpy="1.5707963267949 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="light_link" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+</robot>
