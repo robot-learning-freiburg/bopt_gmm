@@ -1,0 +1,20 @@
+defaults:
+  - env: peg
+  - bopt@bopt_agent: bopt_gmm_base
+
+bopt_agent:
+  gmm: 
+    model: "models/gmm/gmm_iai_peg_3.npy"
+    # model: "models/GMM/gmm_iai_peg_3_100.npy"
+    # model: peg_force_model_3_600.npy
+    # model: last_model_293524.09639436525.npy
+    # model: new_pos_gmm_3.npy
+    # model: peg_f_3.npy
+    type: position
+    force_norm: 1
+
+show_gui: False
+
+env:
+  observation:
+    with_noise: False

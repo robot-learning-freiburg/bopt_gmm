@@ -45,7 +45,7 @@ def sim_loop(env, sim_state, save_dir):
             sim_state.should_save  = False
         else:
             action = {'motion': np.zeros(3),
-                      'gripper': 1}
+                      'gripper': -1}
             if sim_state.last_action is not None:
                 cam_pose  = vis.get_camera_pose()
                 right_dir = cam_pose.dot(Vector3.unit_x()) * Vector3(1, 1, 0)

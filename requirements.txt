@@ -1,0 +1,12 @@
+wheel
+hydra.core(>=1.1.0)
+matlab(>=0.1)
+wandb(>=0.10.32)
+python-socketio
+aiohttp
+gym
+opencv-contrib-python
+scikit-optimize
+smac
+dearpygui
+tqdm

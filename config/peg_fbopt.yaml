@@ -1,0 +1,9 @@
+defaults:
+  - bopt_gmm_peg_env
+  - seds@bopt_agent.gmm_generator: seds_3_priors
+  - override bopt@bopt_agent: bopt_gmm_force
+
+bopt_agent:
+  gmm_generator:
+    seds_path: ${oc.env:SEDS_PATH}
+    max_iter: 300

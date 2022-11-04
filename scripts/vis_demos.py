@@ -5,8 +5,9 @@ import operator
 from argparse  import ArgumentParser
 from functools import reduce
 
-from drlfads.utils.bopt_utils import unpack_trajectories
-from drlfads.lpvDS.seds       import gauss_smoothing
+from bopt_gmm.utils   import unpack_trajectories, \
+                             gauss_smoothing
+
 
 def plot_demonstrations(axes, dim_names, groups, data, plot_name='Trajectory', alignment='start'):
     indices = list(range(data.shape[0])) if alignment == 'start' else list(range(-data.shape[0], 0))

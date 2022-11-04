@@ -1,0 +1,3 @@
+objective: likelihood
+tol_cutting: 0.05
+max_iter: 600

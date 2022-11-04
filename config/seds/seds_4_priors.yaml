@@ -1,0 +1,4 @@
+defaults:
+  - seds_base
+
+n_priors: 4

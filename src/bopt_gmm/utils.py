@@ -1,7 +1,9 @@
 import hashlib 
+import operator
 import omegaconf as oc
 import numpy     as np
 
+from functools import reduce
 from pathlib import Path
 
 
@@ -68,6 +70,89 @@ def save_demo_npz(observations, save_dir):
     np.savez(filename, **obs_dict)
     print(f"Saved file {filename}")
     return filename
+
+def unpack_transition_traj(t, white_list=None):
+    iter_order = []
+    fields = []
+    data   = []
+    groups = []
+    for (pobs, _, _, _, _) in t:
+        if type(pobs) == dict:
+            if len(fields) == 0:
+                for k, v in pobs.items():
+                    if white_list is not None and k not in white_list:
+                        continue
+
+                    iter_order.append(k)
+                    try:
+                        groups.append([len(fields) + x for x in range(len(v))])
+                        fields += [f'{k}_{x}' for x in range(len(v))]
+                    except TypeError:
+                        groups.append([len(fields)])
+                        fields.append(k)
+            
+            data.append(np.hstack([pobs[k] for k in iter_order]))
+        else:
+            if len(fields) == 0:
+                fields = [f'dim_{x}' for x in range(pobs)]
+                groups.append(list(range(len(fields))))
+    
+            data.append(pobs)
+    
+    return fields, groups, np.vstack(data)
+
+
+def unpack_trajectories(file_paths, traj_files, white_list=None):
+    trajs = []
+    for fp, tf in zip(file_paths, traj_files):
+
+        if tf[tf.files[0]].dtype != object:
+            t = []
+            groups    = []
+            dim_names = []
+            for f in tf.files:
+                if white_list is not None and f not in white_list:
+                    continue
+
+                st = tf[f]
+                if st.ndim == 1:
+                    st = st.reshape((st.shape[0], 1))
+                elif st.ndim > 2:
+                    st = st.reshape((st.shape[0], (reduce(operator.mul, st.shape[1:], 1))))
+                groups.append([len(dim_names) + x for x in range(st.shape[1])])
+                dim_names += [f'{f}_{x}' for x in range(st.shape[1])]
+                t.append(st)
+                
+            trajs.append((fp, dim_names, groups, np.hstack(t)))
+        else:
+            for x, t in enumerate(tf[tf.files[0]]):
+                trajs.append((f'{fp} {x}', ) + unpack_transition_traj(t, white_list))
+    return trajs
+
+
+def gauss_smoothing(o_series, steps):
+    if len(o_series.shape) < 2:
+        series = o_series.reshape((o_series.shape[0], 1))
+    else:
+        series = o_series
+
+    acc = []
+    smooth_op = np.array([(1 / np.sqrt(2 * np.pi)) * np.exp(-0.5 * x**2)  for x in np.linspace(-2, 2, steps * 2 + 1)])
+
+    # Slow :(
+    for s in series.T:
+        m_series =  np.zeros((len(s), steps * 2 + 1))
+        m_series[:steps]   = s[0]
+        m_series[-steps:]  = s[-1]
+        m_series[:, steps] = s
+
+        for x in range(1, steps + 1):
+            m_series[ :-x, steps + x] = s[x:]
+            m_series[x:  , steps - x] = s[:-x]
+
+        acc.append(m_series @ smooth_op)
+    return np.vstack(acc).T.reshape(o_series.shape)
+
 
 
 if __name__ == '__main__':

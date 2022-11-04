@@ -1,0 +1,10 @@
+agent:  ???        # Agent type [bopt-gmm, dbopt]
+prior_range: 0.15  # Range to vary the prior weights by [-v, v]
+mean_range:  0.10  # Range to vary the in percentage by [-v, v]
+early_tell: 5      # Min number of steps to inform the optimizer after
+late_tell: 100000  # Max number of steps to inform the optimizer after
+
+gmm:
+  model: ???
+  type:  ???
+  force_norm: ???
