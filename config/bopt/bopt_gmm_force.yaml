@@ -2,7 +2,7 @@ defaults:
   - bopt_gmm_base
 
 agent: bopt-gmm
-n_successes: 15         # Number of successful trajectories to collect before generating new GMM
+n_successes: 12         # Number of successful trajectories to collect before generating new GMM
 normalize_force: False  # Normalize the force measurements when generating the new GMM
 debug_data_path: bopt_gmm_trajectories # Prefix for saving the successful trajectories used to train the GMM
 debug_gmm_path: bopt_gmm_model         # Prefix for saving the newly generated gmm

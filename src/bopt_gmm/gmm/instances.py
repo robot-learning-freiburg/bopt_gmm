@@ -74,6 +74,6 @@ class GMMCart3DForce(GMM):
         return [6, 7, 8, 9, 10, 11]
 
 
-class GMMCartTorque(GMMCart3DForce):
+class GMMCart3DTorque(GMMCart3DForce):
     def predict(self, obs_dict):
         return super().super().predict(np.hstack((obs_dict['position'], obs_dict['torque'])), self.GIVEN)[:,:3]

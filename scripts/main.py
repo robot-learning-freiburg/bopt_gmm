@@ -9,7 +9,7 @@ from datetime                   import datetime
 from omegaconf                  import OmegaConf
 from pathlib                    import Path
 from skopt                      import gp_minimize
-from smac.facade.smac_bb_facade import SMAC4BB
+# from smac.facade.smac_bb_facade import SMAC4BB
 from smac.scenario.scenario     import Scenario
 from tqdm                       import tqdm
 
@@ -41,7 +41,7 @@ class AgentWrapper(object):
     def predict(self, obs):
         if 'force' in obs:
             obs['force'] = obs['force'] * self._force_norm
-        return {'motion': self._model.predict(obs).flatten(), 'gripper': 1.0}
+        return {'motion': self._model.predict(obs).flatten(), 'gripper': -1.0}
 
     def step(self, *args):
         pass
@@ -222,38 +222,38 @@ def opt_pos_f_means(base_gmm, env, bounds=(-5, 5)):
     return res
 
 
-def opt_smac_prior_and_means(base_gmm, env, prior_bounds=(-0.15, 0.15), mean_bounds=(-0.005, 0.005)):
-    cspace = ConfigurationSpace()
+# def opt_smac_prior_and_means(base_gmm, env, prior_bounds=(-0.15, 0.15), mean_bounds=(-0.005, 0.005)):
+#     cspace = ConfigurationSpace()
 
-    prior_names = []
-    means_names = []
+#     prior_names = []
+#     means_names = []
 
-    for x in range(base_gmm.n_priors):
-        prior_name = f'prior_{x}'
-        prior_names.append(prior_name)
-        cspace.add_hyperparameter(UniformFloatHyperparameter(prior_name, *prior_bounds))
-        for val in 'x y z vx vy vz'.split(' '):
-            name = f'mean_{x}_{val}'
-            means_names.append(name)
-            cspace.add_hyperparameter(UniformFloatHyperparameter(name, *mean_bounds))
+#     for x in range(base_gmm.n_priors):
+#         prior_name = f'prior_{x}'
+#         prior_names.append(prior_name)
+#         cspace.add_hyperparameter(UniformFloatHyperparameter(prior_name, *prior_bounds))
+#         for val in 'x y z vx vy vz'.split(' '):
+#             name = f'mean_{x}_{val}'
+#             means_names.append(name)
+#             cspace.add_hyperparameter(UniformFloatHyperparameter(name, *mean_bounds))
 
-    scenario = Scenario({
-        'run_obj': 'quality',
-        'runcount-limit': 50,
-        'cs': cspace
-    })
+#     scenario = Scenario({
+#         'run_obj': 'quality',
+#         'runcount-limit': 50,
+#         'cs': cspace
+#     })
 
-    def eval(config):
-        gmm = base_gmm.update_gaussian([config[n] for n in prior_names],
-                                       np.array([config[n] for n in means_names]))
-        accuracy, mean_return, mean_length = evaluate(env, gmm, max_steps=600, num_episodes=5)
-        print("Accuracy:", accuracy, "mean_return:", mean_return)
-        return -mean_return
+#     def eval(config):
+#         gmm = base_gmm.update_gaussian([config[n] for n in prior_names],
+#                                        np.array([config[n] for n in means_names]))
+#         accuracy, mean_return, mean_length = evaluate(env, gmm, max_steps=600, num_episodes=5)
+#         print("Accuracy:", accuracy, "mean_return:", mean_return)
+#         return -mean_return
 
-    smac = SMAC4BB(scenario=scenario, tae_runner=eval)
-    best_config = smac.optimize()
+#     smac = SMAC4BB(scenario=scenario, tae_runner=eval)
+#     best_config = smac.optimize()
 
-    print(f'Best update:\nPriors: {[best_config[n] for n in prior_names]}\nMeans: {np.array([best_config[n] for n in means_names])}')
+#     print(f'Best update:\nPriors: {[best_config[n] for n in prior_names]}\nMeans: {np.array([best_config[n] for n in means_names])}')
 
 
 GMM_TYPES = {'position': GMMCart3D,

@@ -181,7 +181,7 @@ class PegEnv(Env):
 
         # Horizontal goal, vertical goal
         if (peg_pos_in_target * Vector3(1, 1, 0)).norm() < 0.005 and \
-            peg_pos_in_target.z <= 0.01:
+            peg_pos_in_target.z <= 0.005:
             return True, True
         elif (self.eef.pose.position - self.peg.pose.position).norm() > 0.25: # Peg was dropped
             return True, False
@@ -192,4 +192,4 @@ class PegEnv(Env):
         return self.board.links['target'].pose.position
 
     def _set_gripper_relative_goal(self, delta):
-        self.robot.apply_joint_pos_cmds({j.name: self.robot.joint_state[j.name].position + delta for j in self.gripper_joints}, [200]*2)
+        self.robot.apply_joint_pos_cmds({j.name: self.robot.joint_state[j.name].position + delta for j in self.gripper_joints}, [800]*2)

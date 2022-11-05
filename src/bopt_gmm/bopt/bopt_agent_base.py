@@ -7,17 +7,10 @@ from typing      import Callable, Any, Iterable, Tuple
 
 import bopt_gmm.gmm as lib_gmm
 from bopt_gmm.logging import LoggerBase
-from drlfads.lpvDS.seds      import SEDS_MATLAB, \
-                                    gen_seds_data_from_trajectories, \
-                                    gen_seds_data_from_transitions,  \
-                                    seds_data_prep_last_step
 
 
 def base_success(prior_obs, posterior_obs, action, reward, done):
     return done and reward > 0
-
-def base_gen_gmm(trajectories, delta_t):
-    raise NotImplementedError
 
 def no_op(_, x):
     return x
@@ -66,7 +59,7 @@ class BOPTGMMAgentBase(object):
 
     def predict(self, observation):
         observation = self.state.obs_transform(observation)
-        return {'motion': self.model.predict(observation).flatten(), 'gripper': 0.1}
+        return {'motion': self.model.predict(observation).flatten(), 'gripper': -1.0}
 
     def step(self, prior_obs, posterior_obs, action, reward, done):
         if reward != 0:

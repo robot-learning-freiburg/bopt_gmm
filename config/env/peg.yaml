@@ -18,6 +18,6 @@ robot:
     - panda_finger_joint2
   initial_pose:
     q: [0, -0.3, 0, -2.2, 0, 2.0, 0.7853981633974483]  # only used for IK
-    position: [0.35, 0, 0.40]
+    position: [0.35, 0, 0.30]
     orientation: [1, 0, 0, 0]
     gripper_width: 0.05

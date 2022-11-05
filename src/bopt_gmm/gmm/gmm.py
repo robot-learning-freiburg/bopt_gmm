@@ -1,12 +1,15 @@
-from argparse import ArgumentError
-from random import random
-
 import sys
 import numpy as np
-from itertools import cycle
-from typing    import Union
 
-from pathlib import Path
+from argparse    import ArgumentError
+from itertools   import cycle
+from pathlib     import Path
+from random      import random
+from scipy.stats import multivariate_normal
+from typing      import Union
+
+
+
 
 from .utils import isPD, nearestPD
 

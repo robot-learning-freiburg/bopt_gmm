@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from .bopt_agent_base import BOPTGMMAgentBase, \
                              BOPTAgentConfig
 

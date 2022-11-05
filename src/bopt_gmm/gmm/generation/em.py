@@ -3,6 +3,9 @@ import numpy as np
 from scipy.stats import multivariate_normal
 from sklearn.mixture import BayesianGaussianMixture
 
+from bopt_gmm.gmm import GMM
+
+
 def gmm_fit_em(n_components, points, gmm_type=GMM):
     """EM-Algorithm for fitting a GMM to data
 

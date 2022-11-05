@@ -1,10 +1,26 @@
+import numpy as np
+
+from dataclasses import dataclass
+from datetime    import datetime
+from typing      import Callable, Any, Iterable, Tuple
+
+import bopt_gmm.gmm as lib_gmm
+
 from .bopt_agent_base import BOPTGMMAgentBase, \
                              BOPTAgentConfig
+
+from bopt_gmm.gmm.generation import SEDS_MATLAB, \
+                                    gen_seds_data_from_transitions, \
+                                    seds_data_prep_last_step
+
+
+def base_gen_gmm(trajectories, delta_t):
+    raise NotImplementedError
 
 @dataclass
 class BOPTAgentGenGMMConfig(BOPTAgentConfig):
     n_successes     : int = 10
-    f_gen_gmm       : Callable[[Iterable[Tuple[Any, Any, Any, float, bool]], float], GMM] = base_gen_gmm
+    f_gen_gmm       : Callable[[Iterable[Tuple[Any, Any, Any, float, bool]], float], lib_gmm.GMM] = base_gen_gmm
     delta_t         : float = 0.05
     debug_data_path : str = None
     debug_gmm_path  : str = None

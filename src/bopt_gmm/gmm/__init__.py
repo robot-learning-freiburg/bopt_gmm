@@ -2,6 +2,6 @@ from .gmm import GMM
 
 from .instances import GMMCart3D,      \
                        GMMCart3DForce, \
-                       GMMCartTorque
+                       GMMCart3DTorque
 
-import generation
+from . import generation
