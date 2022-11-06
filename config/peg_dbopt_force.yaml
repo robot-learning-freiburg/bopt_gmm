@@ -1,0 +1,7 @@
+defaults:
+  - peg_dbopt
+
+bopt_agent:
+  gmm:
+    model: "models/gmm/peg_n_f_3p.npy"
+    type: force

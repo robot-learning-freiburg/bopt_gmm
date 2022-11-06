@@ -3,6 +3,12 @@ prior_range: 0.15  # Range to vary the prior weights by [-v, v]
 mean_range:  0.10  # Range to vary the in percentage by [-v, v]
 early_tell: 5      # Min number of steps to inform the optimizer after
 late_tell: 100000  # Max number of steps to inform the optimizer after
+reward_processor: "mean"
+base_estimator: "GP"
+initial_p_gen: "random"
+n_initial_points: 10
+acq_func: "EI"
+acq_optimizer: "auto"
 
 gmm:
   model: ???

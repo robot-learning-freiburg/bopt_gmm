@@ -1,0 +1,7 @@
+defaults:
+  - peg_dbopt
+
+bopt_agent:
+  gmm:
+    model: "models/gmm/peg_n_t_3p.npy"
+    type: torque

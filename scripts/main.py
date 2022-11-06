@@ -257,7 +257,8 @@ def opt_pos_f_means(base_gmm, env, bounds=(-5, 5)):
 
 
 GMM_TYPES = {'position': GMMCart3D,
-                'force': GMMCart3DForce}
+                'force': GMMCart3DForce,
+               'torque': GMMCart3DTorque}
 
 def load_gmm(gmm_config):
     return GMM_TYPES[gmm_config.type].load_model(gmm_config.model)
@@ -302,7 +303,13 @@ def main_bopt_agent(env, bopt_agent_config, conf_hash, show_force=True, wandb=Fa
                                        mean_range=bopt_agent_config.mean_range,
                                        early_tell=bopt_agent_config.early_tell,
                                        late_tell=bopt_agent_config.late_tell,
+                                       reward_processor=bopt_agent_config.reward_processor,
                                        n_successes=bopt_agent_config.n_successes,
+                                       base_estimator=bopt_agent_config.base_estimator,
+                                       initial_p_gen=bopt_agent_config.initial_p_gen,
+                                       n_initial_points=bopt_agent_config.n_initial_points,
+                                       acq_func=bopt_agent_config.acq_func,
+                                       acq_optimizer=bopt_agent_config.acq_optimizer,
                                        delta_t=env.dt,
                                        f_gen_gmm=gmm_generator,
                                        debug_data_path=f'{model_dir}/{bopt_agent_config.debug_data_path}',
@@ -314,6 +321,12 @@ def main_bopt_agent(env, bopt_agent_config, conf_hash, show_force=True, wandb=Fa
                                     mean_range=bopt_agent_config.mean_range,
                                     early_tell=bopt_agent_config.early_tell,
                                     late_tell=bopt_agent_config.late_tell,
+                                    reward_processor=bopt_agent_config.reward_processor,
+                                    base_estimator=bopt_agent_config.base_estimator,
+                                    initial_p_gen=bopt_agent_config.initial_p_gen,
+                                    n_initial_points=bopt_agent_config.n_initial_points,
+                                    acq_func=bopt_agent_config.acq_func,
+                                    acq_optimizer=bopt_agent_config.acq_optimizer,
                                     base_accuracy=bopt_agent_config.base_accuracy)
 
         agent  = BOPTGMMAgent(base_gmm, config, logger=logger)

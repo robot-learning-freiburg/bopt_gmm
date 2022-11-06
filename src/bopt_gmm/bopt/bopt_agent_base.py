@@ -20,11 +20,17 @@ BOPT_TIME_SCALE = 'bopt_step'
 
 @dataclass
 class BOPTAgentConfig:
-    f_success   : Callable[[Any, Any, Any, float, bool], bool] = base_success
-    prior_range : float = 0.15
-    mean_range  : float = 0.05
-    early_tell  : int   = 5
-    late_tell   : int   = 100000
+    f_success        : Callable[[Any, Any, Any, float, bool], bool] = base_success
+    prior_range      : float = 0.15
+    mean_range       : float = 0.05
+    early_tell       : int   = 5
+    late_tell        : int   = 100000
+    reward_processor : str   = 'mean'    # mean, raw
+    base_estimator   : str   = 'GP'
+    initial_p_gen    : str   = 'random'
+    n_initial_points : int   = 10
+    acq_func         : str   = 'gp_hedge'
+    acq_optimizer    : str   = 'auto'
 
 
 class BOPTGMMAgentBase(object):
@@ -33,6 +39,7 @@ class BOPTGMMAgentBase(object):
         step    : int   = 0
         updates : int   = 0
         reward  : float = 0.0
+        reward_samples : int = 0
     
     @dataclass
     class State:
@@ -82,7 +89,12 @@ class BOPTGMMAgentBase(object):
         self.state.base_accuracy = base_accuracy if base_accuracy is not None else len(self.state.success_trajectories) / len(self.state.trajectories)
 
         self.state.gp_optimizer  = Optimizer([(-self.config.prior_range, self.config.prior_range)] * self.base_model.n_priors + 
-                                             [(-self.config.mean_range, self.config.mean_range)] * self.base_model.n_priors * self.base_model.n_dims)
+                                             [(-self.config.mean_range, self.config.mean_range)] * self.base_model.n_priors * self.base_model.n_dims,
+                                             base_estimator=self.config.base_estimator,
+                                             n_initial_points=self.config.n_initial_points,
+                                             initial_point_generator=self.config.initial_p_gen,
+                                             acq_func=self.config.acq_func,
+                                             acq_optimizer=self.config.acq_optimizer)
         
         print(f'Base Model:\nPriors: {self.base_model.pi()}\nMu: {self.base_model.mu()}')
 
@@ -91,6 +103,7 @@ class BOPTGMMAgentBase(object):
     def step_optimizer(self, reward):
         self.state.bopt_state.step   += 1
         self.state.bopt_state.reward += reward
+        self.state.bopt_state.reward_samples += 1
 
         if self.state.bopt_state.step % min(max(int(1.0 / self.state.base_accuracy), self.config.early_tell), self.config.late_tell) == 0:
             print(f"Finished gp run {self.state.bopt_state.updates} ({self.state.bopt_state.step}). Return: {self.state.bopt_state.reward}. Let's go again!")
@@ -117,9 +130,11 @@ class BOPTGMMAgentBase(object):
             raise Exception(f'Repeated Bayesian Updates have failed to produce a valid update')
 
     def _tell(self, state, reward):
+        reward = reward if self.config.reward_processor == 'raw' else reward / self.state.bopt_state.reward_samples
         self.state.gp_optimizer.tell(state, -reward)
         self.state.bopt_state.updates += 1
         self.state.bopt_state.reward   = 0.0
+        self.state.bopt_state.reward_samples = 0
         if self.logger is not None:
             self.logger.log({
                 BOPT_TIME_SCALE: self.state.bopt_state.updates,

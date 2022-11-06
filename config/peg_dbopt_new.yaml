@@ -1,0 +1,7 @@
+defaults:
+  - peg_dbopt
+
+bopt_agent:
+  gmm:
+    model: "models/gmm/peg_n_3p.npy"
+    type: position

@@ -35,6 +35,24 @@ class BoxSampler(object):
         return (np.random.random(len(self.b_min)) * (np.asarray(self.b_max) - np.asarray(self.b_min))) + np.asarray(self.b_min)
 
 
+class NoiseSampler(object):
+    def __init__(self, dim, var, constant) -> None:
+        self.constant = constant
+        self.dim = dim
+        self.var = var
+        self._noise = None
+        self.reset()
+    
+    def sample(self):
+        if self.constant and self._noise is not None:
+            return self._noise
+        return np.random.normal(0, self.var, self.dim)
+        
+    def reset(self):
+        self._noise = None
+        self._noise = self.sample()
+
+
 class PegEnv(Env):
     def __init__(self, cfg, show_gui=False):
         self.sim = BasicSimulator(cfg.action_frequency)
@@ -72,7 +90,9 @@ class PegEnv(Env):
         self.peg.initial_pose = Transform.from_xyz(*peg_position)
         self.peg.pose         = self.peg.initial_pose
 
-        print(f'1\n{self.peg.pose}')
+        self.noise_samplers = {k: NoiseSampler(s.shape, 
+                                               cfg.noise[k].variance, 
+                                               cfg.noise[k].constant) for k, s in self.observation_space.items() if k in cfg.noise}
 
         # print(f'Original: {temp_eef_pose}\nResolved EEF state: {self.eef.pose}\nDesired: {self._init_pose}\nPeg pos: {peg_position}')
 
@@ -87,8 +107,8 @@ class PegEnv(Env):
     @property
     @lru_cache(1)
     def observation_space(self):
-        return DictSpace({'position':      BoxSpace(low=self.workspace.min, 
-                                                    high=self.workspace.max),
+        return DictSpace({'position':      BoxSpace(low=self.workspace.min.numpy(), 
+                                                    high=self.workspace.max.numpy()),
                           'gripper_width': BoxSpace(low=0.03, high=0.11, shape=(1,)),
                           'force':         BoxSpace(np.ones(3) * -5, np.ones(3) * 5),
                           'torque':        BoxSpace(np.ones(3) * -5, np.ones(3) * 5)
@@ -107,6 +127,9 @@ class PegEnv(Env):
             dbg_pos, dbg_dist, dbg_pitch, dbg_yaw = self.visualizer.get_camera_position()
 
             dbg_rel_pos = dbg_pos - self.board.pose.position
+
+        for v in self.noise_samplers.values():
+            v.reset()
 
         self.sim.reset()
 
@@ -157,10 +180,15 @@ class PegEnv(Env):
         return obs, reward, done, {'success' : success}
 
     def observation(self):
-        return {'position'      : (self.peg.pose.position - self.target_position).numpy(),
-                'gripper_width' : sum(self.robot.joint_state[j.name].position for j in self.gripper_joints),
-                'force'         : self.eef_ft_sensor.get().linear.numpy(),
-                'torque'        : self.eef_ft_sensor.get().angular.numpy()}
+        out = {'position'      : (self.peg.pose.position - self.target_position).numpy(),
+               'gripper_width' : sum(self.robot.joint_state[j.name].position for j in self.gripper_joints),
+               'force'         : self.eef_ft_sensor.get().linear.numpy(),
+               'torque'        : self.eef_ft_sensor.get().angular.numpy()}
+        for k in out:
+            if k in self.noise_samplers:
+                out[k] += self.noise_samplers[k].sample()
+        
+        return out
 
     def close(self):
         self.sim.kill()

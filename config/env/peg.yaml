@@ -9,6 +9,11 @@ board:
 peg:
   path: package://bopt_gmm/objects/cylinder.urdf
 
+noise:
+  position:
+    variance: 0.0
+    constant: true
+
 robot:
   path: package://bopt_gmm/robots/panda_hand.urdf
   eef: panda_hand_tcp
