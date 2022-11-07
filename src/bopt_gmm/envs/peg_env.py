@@ -92,7 +92,7 @@ class PegEnv(Env):
 
         self.noise_samplers = {k: NoiseSampler(s.shape, 
                                                cfg.noise[k].variance, 
-                                               cfg.noise[k].constant) for k, s in self.observation_space.items() if k in cfg.noise}
+                                               cfg.noise[k].constant) for k, s in self.observation_space.sample().items() if k in cfg.noise}
 
         # print(f'Original: {temp_eef_pose}\nResolved EEF state: {self.eef.pose}\nDesired: {self._init_pose}\nPeg pos: {peg_position}')
 
