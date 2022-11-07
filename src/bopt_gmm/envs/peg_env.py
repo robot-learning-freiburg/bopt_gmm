@@ -68,6 +68,7 @@ class PegEnv(Env):
 
         self.table = self.sim.create_box(Vector3(0.6, 1, 0.05), Transform.from_xyz(0.5, 0, -0.025), color=(1, 1, 1, 1), mass=0)
         self.board = self.sim.load_urdf(cfg.board.path, useFixedBase=True)
+        # self.peg   = self.robot.links['peg'] #
         self.peg   = self.sim.load_urdf(cfg.peg.path)
 
         if self.sim.visualizer is not None:
@@ -96,7 +97,8 @@ class PegEnv(Env):
 
         # print(f'Original: {temp_eef_pose}\nResolved EEF state: {self.eef.pose}\nDesired: {self._init_pose}\nPeg pos: {peg_position}')
 
-        self.controller     = CartesianRelativePointCOrientationController(self.robot, self.eef)
+        # self.controller     = CartesianRelativePointCOrientationController(self.robot, self.eef)
+        self.controller     = CartesianRelativeVPointCOrientationController(self.robot, self.eef, 0.02)
 
         self._elapsed_steps = 0
 

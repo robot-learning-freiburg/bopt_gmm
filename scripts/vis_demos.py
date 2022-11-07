@@ -26,12 +26,12 @@ def plot_demonstrations(axes, dim_names, groups, data, plot_name='Trajectory', a
         ax.set_ylabel(name)
         ax.grid(True)
     
-    for g in groups:
-        g_data = data[:,g] #  np.take(data, g, axis=0)
-        g_lim  = np.asarray((g_data.min(), g_data.max()))
-        g_lim  = np.asarray((-0.55, 0.55)) * (g_lim[1] - g_lim[0]) + g_lim.mean() 
-        for a in np.take(axes, g):
-            a.set_ylim(g_lim)
+    # for g in groups:
+    #     g_data = data[:,g] #  np.take(data, g, axis=0)
+    #     g_lim  = np.asarray((g_data.min(), g_data.max()))
+    #     g_lim  = np.asarray((-0.55, 0.55)) * (g_lim[1] - g_lim[0]) + g_lim.mean() 
+    #     for a in np.take(axes, g):
+    #         a.set_ylim(g_lim)
 
 
 def plot_fig(trajectories, axes_dim_in=(6, 1.5), plot_path=None, overlay=False, alignment='start'):

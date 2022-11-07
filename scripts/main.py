@@ -405,7 +405,7 @@ if __name__ == '__main__':
         else: 
             logger = None
 
-        acc, returns, lengths = evaluate(env, gmm, max_steps=600, num_episodes=100, show_force=cfg.show_gui and False, force_norm=cfg.bopt_agent.gmm.force_norm, logger=logger)
+        acc, returns, lengths = evaluate(env, gmm, max_steps=600, num_episodes=100, show_force=cfg.show_gui, force_norm=cfg.bopt_agent.gmm.force_norm, logger=logger)
         print(f'Eval result:\n  Accuracy: {acc}\n  Mean returns: {returns}\n  Mean length: {lengths}')
     
     # Pos GMM result: 52%

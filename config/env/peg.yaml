@@ -16,6 +16,7 @@ noise:
 
 robot:
   path: package://bopt_gmm/robots/panda_hand.urdf
+  # path: package://bopt_gmm/robots/panda_peg.urdf
   eef: panda_hand_tcp
   ft_joint: panda_hand_joint
   fingers:
