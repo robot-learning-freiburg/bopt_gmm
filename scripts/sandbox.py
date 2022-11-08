@@ -5,7 +5,8 @@ import sys
 import time
 
 from argparse      import ArgumentParser
-from bopt_gmm.envs import PegEnv
+from bopt_gmm.envs import PegEnv, \
+                          DoorEnv
 
 
 if __name__ == '__main__':
@@ -17,7 +18,7 @@ if __name__ == '__main__':
     hydra.initialize(config_path="../config")
     cfg = hydra.compose(args.hy, overrides=args.overrides)
 
-    env = PegEnv(cfg.env, True)
+    env = DoorEnv(cfg.env, True)
     env.reset()
 
     # sim = ibs.BasicSimulator(60, real_time=True)
@@ -39,7 +40,7 @@ if __name__ == '__main__':
         # sim.update()
         # wrench = ft_sensor.get()
         # print(f'---\nLin: {wrench.linear}\nAng: {wrench.angular}')
-        _, _, done, _ = env.step({'motion': ibs.Vector3.zero().numpy(), 'gripper': -1})
+        _, _, done, _ = env.step({'motion': ibs.Vector3.zero().numpy()})
         if done:
             env.reset()
         time.sleep(env.dt)

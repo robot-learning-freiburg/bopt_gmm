@@ -343,6 +343,13 @@
                 <cylinder radius="0.025" length="0.075"/>
             </geometry>
         </collision>
+
+        <contact>
+            <friction_anchor/>
+            <lateral_friction value="0.0"/>
+            <rolling_friction value="0.0"/>
+            <spinning_friction value="0.0"/>
+          </contact>
     </link>
     <joint name="peg_joint" type="fixed">
         <origin rpy="0 0 0" xyz="0 0 0.02" />

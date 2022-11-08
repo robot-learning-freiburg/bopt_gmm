@@ -28,7 +28,7 @@ from .utils     import BoxSampler, \
                        NoiseSampler
 
 
-class PegEnv(Env):
+class DoorEnv(Env):
     def __init__(self, cfg, show_gui=False):
         self.sim = BasicSimulator(cfg.action_frequency)
         self.sim.init('gui' if show_gui else 'direct')
@@ -41,30 +41,32 @@ class PegEnv(Env):
         self.eef   = self.robot.get_link(cfg.robot.eef)
         self.gripper_joints = [self.robot.joints[f] for f in cfg.robot.fingers]
 
-        self.table = self.sim.create_box(Vector3(0.6, 1, 0.05), Transform.from_xyz(0.5, 0, -0.025), color=(1, 1, 1, 1), mass=0)
-        self.board = self.sim.load_urdf(cfg.board.path, useFixedBase=True)
-        self.peg   = self.robot.links['peg'] #
-        # self.peg   = self.sim.load_urdf(cfg.peg.path)
+        self._target_position = np.deg2rad(cfg.open_threshold)
+
+        self.table = self.sim.create_box(Vector3(0.6, 1, 0.05), 
+                                         Transform.from_xyz(0.5, 0, -0.025), 
+                                         color=(1, 1, 1, 1), 
+                                         mass=0)
+        # self.peg   = self.robot.links['peg'] #
+        self.door  = self.sim.load_urdf(cfg.door.path, useFixedBase=True)
+        self.reference_link = self.door.links[cfg.door.reference_link]
+        self.board_sampler  = BoxSampler(cfg.door.sampler.min, 
+                                         cfg.door.sampler.max)
 
         if self.sim.visualizer is not None:
-            self.sim.visualizer.set_camera_position(self.target_position, 0.6, -25, 65)
+            self.sim.visualizer.set_camera_position(self.door.pose.position, 0.6, -25, 65)
 
-        self.board_sampler = BoxSampler(cfg.board.sampler.min, 
-                                        cfg.board.sampler.max)
 
         robot_init_state = cfg.robot.initial_pose
 
-        self._init_pose = Transform(Point3(*robot_init_state.position), 
-                                    Quaternion(*robot_init_state.orientation))
+        initial_rot = Quaternion(*robot_init_state.orientation) if len(robot_init_state.orientation) == 4 else Quaternion.from_euler(*robot_init_state.orientation)
+
+        self._init_pose = Transform(Point3(*robot_init_state.position), initial_rot)
         self.robot.set_joint_positions(cfg.robot.initial_pose.q, override_initial=True)
         self.robot.set_joint_positions(self.eef.ik(self._init_pose, 1000), override_initial=True)
         self.robot.set_joint_positions({j.name: robot_init_state.gripper_width / len(self.gripper_joints) for j in self.gripper_joints}, override_initial=True)
 
         self.eef_ft_sensor = self.robot.get_ft_sensor(cfg.robot.ft_joint)
-
-        peg_position = self.eef.pose.position - Vector3(0, 0, 0.02)
-        # self.peg.initial_pose = Transform.from_xyz(*peg_position)
-        # self.peg.pose         = self.peg.initial_pose
 
         self.noise_samplers = {k: NoiseSampler(s.shape, 
                                                cfg.noise[k].variance, 
@@ -103,18 +105,18 @@ class PegEnv(Env):
         if self.visualizer is not None:
             dbg_pos, dbg_dist, dbg_pitch, dbg_yaw = self.visualizer.get_camera_position()
 
-            dbg_rel_pos = dbg_pos - self.board.pose.position
+            dbg_rel_pos = dbg_pos - self.door.pose.position
 
         for v in self.noise_samplers.values():
             v.reset()
 
         self.sim.reset()
 
-        board_position  = Point3(*self.board_sampler.sample())
-        self.board.pose = Transform(board_position, Quaternion.from_euler(np.pi / 2, 0, 0))
+        door_position  = Point3(*self.board_sampler.sample())
+        self.door.pose = Transform(door_position, Quaternion.from_euler(0, 0, 0))
 
         if self.visualizer is not None:
-            self.visualizer.set_camera_position(self.board.pose.position + dbg_rel_pos, dbg_dist, dbg_pitch, dbg_yaw)
+            self.visualizer.set_camera_position(self.door.pose.position + dbg_rel_pos, dbg_dist, dbg_pitch, dbg_yaw)
 
         x_goal = self.eef.pose
         # Only used to restore PID state after reset
@@ -145,8 +147,14 @@ class PegEnv(Env):
         action_motion = action['motion'] / max(np.abs(action['motion']).max(), 1)
         self.controller.act(action_motion * self.dt)
 
-        if 'gripper' in action:
-            self._set_gripper_relative_goal(np.clip(action['gripper'], -1 * self.dt, 1 * self.dt))
+        # if 'gripper' in action:
+        #     self._set_gripper_relative_goal(np.clip(action['gripper'], -1 * self.dt, 1 * self.dt))
+
+        handle_pos = self.door.joint_state['handle_joint'].position
+        switch = max(np.sign(self.door.joints['handle_joint'].q_max * 0.5 - handle_pos), 0.0)
+        # print(switch)
+
+        self.door.apply_joint_pos_cmds([0, 0], [5000 * switch, 1])
 
         self.sim.update()
 
@@ -157,7 +165,7 @@ class PegEnv(Env):
         return obs, reward, done, {'success' : success}
 
     def observation(self):
-        out = {'position'      : (self.peg.pose.position - self.target_position).numpy(),
+        out = {'position'      : (self.eef.pose.position - self.reference_link.pose.position).numpy(),
                'gripper_width' : sum(self.robot.joint_state[j.name].position for j in self.gripper_joints),
                'force'         : self.eef_ft_sensor.get().linear.numpy(),
                'torque'        : self.eef_ft_sensor.get().angular.numpy()}
@@ -180,22 +188,15 @@ class PegEnv(Env):
         if not self.workspace.inside(self.eef.pose.position):
             return True, False
 
-        peg_pos_in_target = self.peg.pose.position - self.target_position
+        door_pos = self.door.joint_state['hinge_joint'].position
 
         # print(peg_pos_in_target)
 
         # Horizontal goal, vertical goal
-        if (peg_pos_in_target * Vector3(1, 1, 0)).norm() < 0.005 and \
-            peg_pos_in_target.z <= 0.005:
+        if door_pos >= self._target_position:
             return True, True
-        elif (self.eef.pose.position - self.peg.pose.position).norm() > 0.25: # Peg was dropped
-            return True, False
+
         return False, False
 
-    @property
-    def target_position(self):
-        return self.board.links['target'].pose.position
-
     def _set_gripper_relative_goal(self, delta):
-        return 
         self.robot.apply_joint_pos_cmds({j.name: self.robot.joint_state[j.name].position + delta for j in self.gripper_joints}, [800]*2)

@@ -7,7 +7,7 @@
  <link name="cylinder">
     <contact>
       <friction_anchor/>
-      <lateral_friction value="0.95"/>
+      <lateral_friction value="0.2"/>
       <rolling_friction value="30.0"/>
       <spinning_friction value="30.0"/>
     </contact>
