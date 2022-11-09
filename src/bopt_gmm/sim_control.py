@@ -9,6 +9,7 @@ from datetime import datetime
 from aiohttp import web
 from iai_bullet_sim import Vector3, \
                            res_pkg_path
+from omegaconf import ListConfig
 
 from bopt_gmm.utils import save_demo_npz
 
@@ -17,11 +18,13 @@ from bopt_gmm.utils import save_demo_npz
 class SimState(object):
     """Class used to control the current state of the simulation"""
 
-    def __init__(self):
-        self.should_reset = True
-        self.last_action = None
+    def __init__(self, input_mapping=np.eye(3)):
+        self.should_reset    = True
+        self.last_action     = None
         self.should_shutdown = False
-        self.should_save = False
+        self.should_save     = False
+        self.input_mapping   = input_mapping
+
 
 def sim_loop(env, sim_state, save_dir):
     print("Sim loop has started")
@@ -45,7 +48,7 @@ def sim_loop(env, sim_state, save_dir):
             sim_state.should_save  = False
         else:
             action = {'motion': np.zeros(3),
-                      'gripper': -1}
+                      'gripper': 0.5}
             if sim_state.last_action is not None:
                 cam_pose  = vis.get_camera_pose()
                 right_dir = cam_pose.dot(Vector3.unit_x()) * Vector3(1, 1, 0)
@@ -54,6 +57,7 @@ def sim_loop(env, sim_state, save_dir):
                 fwd_dir    = Vector3.unit_z().cross(right_dir)
 
                 raw_action = Vector3(*sim_state.last_action[:3])
+                raw_action = sim_state.input_mapping.dot(raw_action)
                 # print(raw_action)
                 cat_action = fwd_dir   * sim_state.last_action[1] + \
                              right_dir * sim_state.last_action[0] + \
@@ -126,13 +130,29 @@ def get_sio(env, sim_state):
     return sio
 
 
-def start_web_app(env, save_dir):
+def start_web_app(cfg, env, save_dir):
     """
     Starts a web app using socketio
     such that the robot can be controlled
     using the keyboard
     """
-    sim_state = SimState()
+    if 'lin_input_mapping' in cfg:
+        val = cfg.lin_input_mapping
+        if type(val) in {int, float}:
+            mapping = np.eye(3) * val
+        elif type(val) in {list, ListConfig}:
+            if type(val[0]) in {list, ListConfig}:
+                mapping = np.array(val)
+                if mapping.shape != (3, 3):
+                    raise Exception(f'Matrix mapping needs to be of (3, 3) shape. Got {mapping.shape}.')
+            else:
+                mapping = np.diag(val)
+        else:
+            raise Exception(f'Incompatible type "{type(val)}" for encoding input mappings.')
+    else:
+        mapping = np.eye(3)
+
+    sim_state = SimState(mapping)
     app = web.Application()
     sio = get_sio(env, sim_state)
     sio.attach(app)

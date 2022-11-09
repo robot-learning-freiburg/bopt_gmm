@@ -1,5 +1,5 @@
 defaults:
-  - env: sawyer_peg_env
+  - door_scenario
 
 save_dir: demos_peg/
 show_gui: True
@@ -10,6 +10,11 @@ with_tactile_sensor: False
 with_orientation: False
 only_pitch: False
 only_yaw: False
+
+teleoperate:
+  lin_input_mapping: [[0, 0, 1],
+                      [0, 1, 0],
+                      [1, 0, 0]]
 
 env:
   settings:

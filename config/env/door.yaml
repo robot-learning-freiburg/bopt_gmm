@@ -1,0 +1,28 @@
+action_frequency: 30
+
+open_threshold: 35 # Degrees
+
+door:
+  path: package://bopt_gmm/objects/door.urdf
+  reference_link: handle_link
+  sampler:
+    min: [0.7, -0.1, 0]
+    max: [0.75, 0.1, 0]
+
+noise:
+  position:
+    variance: 0.0
+    constant: true
+
+robot:
+  path: package://bopt_gmm/robots/panda_hand.urdf
+  eef: panda_hand_tcp
+  ft_joint: panda_hand_joint
+  fingers: 
+    - panda_finger_joint1
+    - panda_finger_joint2
+  initial_pose:
+    q: [0, -0.2, 0.0, -2.5, 1.6, 2.6, 0.7853981633974483]  # only used for IK
+    position: [0.45, 0, 0.30]
+    orientation: [-2.2, 0, -1.57]
+    gripper_width: 0.05

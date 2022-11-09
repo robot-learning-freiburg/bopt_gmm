@@ -29,7 +29,8 @@ from bopt_gmm.logging import WBLogger, \
                              LivePlot, \
                              dpg
 
-from bopt_gmm.envs import PegEnv
+from bopt_gmm.envs import PegEnv, \
+                          DoorEnv
 
 
 class AgentWrapper(object):
@@ -41,7 +42,7 @@ class AgentWrapper(object):
     def predict(self, obs):
         if 'force' in obs:
             obs['force'] = obs['force'] * self._force_norm
-        return {'motion': self._model.predict(obs).flatten(), 'gripper': -1.0}
+        return {'motion': self._model.predict(obs).flatten(), 'gripper': 0.5}
 
     def step(self, *args):
         pass
@@ -385,7 +386,7 @@ if __name__ == '__main__':
         print(f'Eval result:\n  Accuracy: {acc}\n  Mean returns: {returns}\n  Mean length: {lengths}')
         exit()
 
-    env = PegEnv(cfg.env, cfg.show_gui)
+    env = DoorEnv(cfg.env, cfg.show_gui)
 
     if args.mode == 'bopt-gmm':
         conf_hash = conf_checksum(cfg)

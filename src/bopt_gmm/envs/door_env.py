@@ -125,14 +125,17 @@ class DoorEnv(Env):
         # Let the robot drop a bit
         for _ in range(5):
             reset_controller.act(x_goal)
-            self._set_gripper_relative_goal(-self.dt)
+            self._set_gripper_absolute_goal(0.5)
             self.sim.update()
 
         # Wait for PID to restore the initial position
-        while np.abs(reset_controller.delta).max() >= 1e-3:
+        while (np.abs(reset_controller.delta) >= [1e-2, 0.1]).max():
+            # print(f'EE: {self.eef.pose}\nDesired: {x_goal}\nDelta: {np.abs(reset_controller.delta).max()}')
             reset_controller.act(x_goal)
-            self._set_gripper_relative_goal(-self.dt)
+            self._set_gripper_absolute_goal(0.5)
             self.sim.update()
+
+        print('End of reset')
 
         self.controller.reset()
 
@@ -147,8 +150,8 @@ class DoorEnv(Env):
         action_motion = action['motion'] / max(np.abs(action['motion']).max(), 1)
         self.controller.act(action_motion * self.dt)
 
-        # if 'gripper' in action:
-        #     self._set_gripper_relative_goal(np.clip(action['gripper'], -1 * self.dt, 1 * self.dt))
+        if 'gripper' in action:
+            self._set_gripper_absolute_goal(np.clip(action['gripper'], 0, 1))
 
         handle_pos = self.door.joint_state['handle_joint'].position
         switch = max(np.sign(self.door.joints['handle_joint'].q_max * 0.5 - handle_pos), 0.0)
@@ -198,5 +201,5 @@ class DoorEnv(Env):
 
         return False, False
 
-    def _set_gripper_relative_goal(self, delta):
-        self.robot.apply_joint_pos_cmds({j.name: self.robot.joint_state[j.name].position + delta for j in self.gripper_joints}, [800]*2)
+    def _set_gripper_absolute_goal(self, target):
+        self.robot.apply_joint_pos_cmds({j.name: self.robot.joints[j.name].q_max * target for j in self.gripper_joints}, [800]*2)
