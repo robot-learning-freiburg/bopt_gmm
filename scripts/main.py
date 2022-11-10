@@ -17,11 +17,13 @@ from bopt_gmm.bopt import BOPTGMMCollectAndOptAgent, \
                           BOPTGMMAgent,              \
                           BOPTAgentGMMConfig,        \
                           BOPTAgentGenGMMConfig,     \
-                          seds_gmm_generator,        \
                           BOPT_TIME_SCALE
 from bopt_gmm.gmm import GMMCart3D, \
                          GMMCart3DForce, \
                          GMMCart3DTorque
+
+from bopt_gmm.gmm.generation import seds_gmm_generator, \
+                                    em_gmm_generator
 
 from bopt_gmm.utils   import conf_checksum
 from bopt_gmm.logging import WBLogger, \

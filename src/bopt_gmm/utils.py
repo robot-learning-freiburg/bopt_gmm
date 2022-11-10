@@ -154,6 +154,43 @@ def gauss_smoothing(o_series, steps):
     return np.vstack(acc).T.reshape(o_series.shape)
 
 
+def normalize_trajectories(trajectories, norm_group : str):
+    fp, dim_names, groups, data = trajectories[0]
+    for dx, dn in enumerate(dim_names):
+        if dn[:len(norm_group)] == norm_group:
+            break
+    else:
+        raise Exception(f'Could not find a dimension with prefix {norm_group}')
+    
+    full_data = np.vstack([data for _, _, _, data in trajectories])
+
+    for gx, g in enumerate(groups):
+        if dx in g:
+            sub_data = np.take(full_data, g, axis=1)
+            norm_lin_span = np.sqrt(np.sum((sub_data.max(axis=1) - sub_data.min(axis=1))**2))
+            break
+
+    group_factors = []
+    group_names   = []
+    for g in groups:
+        sub_data = np.take(full_data, g, axis=1)
+        lin_span = np.sqrt(np.sum((sub_data.max(axis=1) - sub_data.min(axis=1))**2))
+        group_factors.append(norm_lin_span / lin_span)
+        dim_name = dim_names[g[0]]
+        dim_name = dim_name[:dim_name.rfind('_')]
+        group_names.append(dim_name)
+
+    out = []
+    for fp, dim_names, groups, data in trajectories:
+        out_data = np.hstack(np.take(data, g, axis=0) * gf for g, gf in zip(groups, group_factors))
+        out.append((fp, dim_names, groups, out_data))
+
+    return out, dict(zip(group_names, group_factors))
+
+
+def calculate_trajectory_velocities(t : np.ndarray, delta_t):
+    return np.hstack((t[1:], (t[1:] - t[:-1]) / delta_t))
+
 
 if __name__ == '__main__':
     import hydra

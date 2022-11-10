@@ -9,10 +9,6 @@ import bopt_gmm.gmm as lib_gmm
 from .bopt_agent_base import BOPTGMMAgentBase, \
                              BOPTAgentConfig
 
-from bopt_gmm.gmm.generation import SEDS_MATLAB, \
-                                    gen_seds_data_from_transitions, \
-                                    seds_data_prep_last_step
-
 
 def base_gen_gmm(trajectories, delta_t):
     raise NotImplementedError
@@ -83,22 +79,3 @@ class BOPTGMMCollectAndOptAgent(BOPTGMMAgentBase):
             out.append(nt)
         return out
 
-# ------ SINGELTON SEDS GENERATOR -------
-SEDS = None
-
-def seds_gmm_generator(seds_path, gmm_type, n_priors, objective='likelihood', tol_cutting=0.1, max_iter=600):
-    # Ugly, I know
-    global SEDS
-    
-    if SEDS is None:
-        SEDS = SEDS_MATLAB(seds_path)
-
-    def generator(transitions, delta_t):
-        x0s, xTs, data, oIdx = gen_seds_data_from_transitions(transitions, delta_t, True)
-        x0, xT, data, oIdx   = seds_data_prep_last_step(x0s, xTs, data, oIdx)
-        gmm = SEDS.fit_model(x0, xT, data, oIdx, n_priors, 
-                             objective=objective, dt=delta_t, 
-                             tol_cutting=tol_cutting, max_iter=max_iter, gmm_type=gmm_type)
-        return gmm
-    
-    return generator

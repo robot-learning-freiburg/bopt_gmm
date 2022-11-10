@@ -107,3 +107,23 @@ def print_seds_data_analysis(x_zeros, x_ts, points, indices):
           f'    SD: {np.std(points, axis=0)}\n'
           f'   Min: {np.min(points, axis=0)}\n'
           f'   Max: {np.max(points, axis=0)}\n')
+
+# ------ SINGELTON SEDS GENERATOR -------
+SEDS = None
+
+def seds_gmm_generator(seds_path, gmm_type, n_priors, objective='likelihood', tol_cutting=0.1, max_iter=600):
+    # Ugly, I know
+    global SEDS
+    
+    if SEDS is None:
+        SEDS = SEDS_MATLAB(seds_path)
+
+    def seds_generator(transitions, delta_t):
+        x0s, xTs, data, oIdx = gen_seds_data_from_transitions(transitions, delta_t, True)
+        x0, xT, data, oIdx   = seds_data_prep_last_step(x0s, xTs, data, oIdx)
+        gmm = SEDS.fit_model(x0, xT, data, oIdx, n_priors, 
+                             objective=objective, dt=delta_t, 
+                             tol_cutting=tol_cutting, max_iter=max_iter, gmm_type=gmm_type)
+        return gmm
+    
+    return seds_generator
