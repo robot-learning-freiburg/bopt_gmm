@@ -8,9 +8,6 @@ from random      import random
 from scipy.stats import multivariate_normal
 from typing      import Union
 
-
-
-
 from .utils import isPD, nearestPD
 
 class GMM(object):

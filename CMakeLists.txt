@@ -10,6 +10,7 @@ project(bopt_gmm)
 find_package(catkin REQUIRED COMPONENTS
   rospy
   iai_bullet_sim
+  roebots
 )
 
 ## System dependencies are found with CMake's conventions

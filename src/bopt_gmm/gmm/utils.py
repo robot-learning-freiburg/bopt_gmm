@@ -52,6 +52,18 @@ def isPD(B):
         return False
 
 
+def rollout(gmm, start, steps=100, dt=1/30):
+    traj  = [start]
+    point = start
+    position_dim = tuple(range(gmm.n_dims // 2))
+
+    for _ in range(steps):
+        vel   = gmm.predict(point, position_dim)
+        point = point + dt * vel
+        traj.append(point)
+    
+    return np.vstack(traj)
+
 if __name__ == "__main__":
     for i in range(10):
         for j in range(2, 100):
