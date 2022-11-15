@@ -15,11 +15,15 @@ if __name__ == '__main__':
     parser.add_argument('--show-all', action='store_true', help='Show all rollouts at once or one-by-one.')
     parser.add_argument('--steps', default=300, type=int, help='Number of steps to rollout.')
     parser.add_argument('--action-freq', default=30, type=int, help='Prediction interval in Hz.')
+    parser.add_argument('--print', action='store_true', help='Print GMM information')
     args = parser.parse_args()
 
     trajs = unpack_trajectories(args.trajectories, 
                                 [np.load(t, allow_pickle=True) for t in args.trajectories])
     gmm = GMM.load_model(args.gmm)
+
+    if args.print:
+        print(f'GMM ({gmm.n_priors}, {gmm.n_dims})\n  Prior: {gmm.pi()}\n  Means: \n {gmm.mu()}\n  Cvar: \n {gmm.sigma()}')
 
     rospy.init_node('bopt_gmm_visualizer')
 
