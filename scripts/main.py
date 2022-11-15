@@ -68,7 +68,7 @@ def evaluate(env, model,
              force_norm=1.0,
              logger=None,
              const_gripper_cmd=0.0):
-    return evaluate_agent(env, AgentWrapper(model, force_norm, const_gripper_command), max_steps, 
+    return evaluate_agent(env, AgentWrapper(model, force_norm, const_gripper_cmd), max_steps, 
                           num_episodes, show_force, render, logger=logger)
 
 

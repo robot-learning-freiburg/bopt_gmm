@@ -182,7 +182,7 @@ def normalize_trajectories(trajectories, norm_group : str):
 
     out = []
     for fp, dim_names, groups, data in trajectories:
-        out_data = np.hstack(np.take(data, g, axis=0) * gf for g, gf in zip(groups, group_factors))
+        out_data = np.hstack(np.take(data, g, axis=1) * gf for g, gf in zip(groups, group_factors))
         out.append((fp, dim_names, groups, out_data))
 
     return out, dict(zip(group_names, group_factors))
