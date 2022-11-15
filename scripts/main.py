@@ -36,15 +36,16 @@ from bopt_gmm.envs import PegEnv, \
 
 
 class AgentWrapper(object):
-    def __init__(self, model, force_norm=1.0) -> None:
+    def __init__(self, model, force_norm=1.0, gripper_command=0.0) -> None:
         self._model = model
         self.pseudo_bopt_step = 0
         self._force_norm = force_norm
+        self._gripper_command = gripper_command
 
     def predict(self, obs):
         if 'force' in obs:
             obs['force'] = obs['force'] * self._force_norm
-        return {'motion': self._model.predict(obs).flatten(), 'gripper': 0.5}
+        return {'motion': self._model.predict(obs).flatten(), 'gripper': self._gripper_command}
 
     def step(self, *args):
         pass
@@ -59,8 +60,16 @@ class AgentWrapper(object):
         self.pseudo_bopt_step += 1
         return self.pseudo_bopt_step
 
-def evaluate(env, model, max_steps=2000, num_episodes=10, show_force=False, render=False, force_norm=1.0, logger=None):
-    return evaluate_agent(env, AgentWrapper(model, force_norm), max_steps, num_episodes, show_force, render, logger=logger)
+def evaluate(env, model,
+             max_steps=2000,
+             num_episodes=10,
+             show_force=False,
+             render=False,
+             force_norm=1.0,
+             logger=None,
+             const_gripper_cmd=0.0):
+    return evaluate_agent(env, AgentWrapper(model, force_norm, const_gripper_command), max_steps, 
+                          num_episodes, show_force, render, logger=logger)
 
 
 @dataclass
@@ -313,6 +322,7 @@ def main_bopt_agent(env, bopt_agent_config, conf_hash, show_force=True, wandb=Fa
                                        n_initial_points=bopt_agent_config.n_initial_points,
                                        acq_func=bopt_agent_config.acq_func,
                                        acq_optimizer=bopt_agent_config.acq_optimizer,
+                                       gripper_command=bopt_agent_config.gripper_command,
                                        delta_t=env.dt,
                                        f_gen_gmm=gmm_generator,
                                        debug_data_path=f'{model_dir}/{bopt_agent_config.debug_data_path}',
@@ -330,6 +340,7 @@ def main_bopt_agent(env, bopt_agent_config, conf_hash, show_force=True, wandb=Fa
                                     n_initial_points=bopt_agent_config.n_initial_points,
                                     acq_func=bopt_agent_config.acq_func,
                                     acq_optimizer=bopt_agent_config.acq_optimizer,
+                                    gripper_command=bopt_agent_config.gripper_command,
                                     base_accuracy=bopt_agent_config.base_accuracy)
 
         agent  = BOPTGMMAgent(base_gmm, config, logger=logger)
@@ -384,7 +395,11 @@ if __name__ == '__main__':
 
         env = PegEnv(cfg.env, cfg.show_gui)
 
-        acc, returns, lengths = evaluate(env, gmm, max_steps=600, num_episodes=100, show_force=cfg.show_gui, force_norm=f_norm)
+        acc, returns, lengths = evaluate(env, gmm,
+                                         max_steps=600,
+                                         num_episodes=100,
+                                         show_force=cfg.show_gui,
+                                         force_norm=f_norm)
         print(f'Eval result:\n  Accuracy: {acc}\n  Mean returns: {returns}\n  Mean length: {lengths}')
         exit()
 
@@ -408,7 +423,13 @@ if __name__ == '__main__':
         else: 
             logger = None
 
-        acc, returns, lengths = evaluate(env, gmm, max_steps=600, num_episodes=100, show_force=cfg.show_gui, force_norm=cfg.bopt_agent.gmm.force_norm, logger=logger)
+        acc, returns, lengths = evaluate(env, gmm,
+                                         max_steps=600,
+                                         num_episodes=100,
+                                         show_force=cfg.show_gui,
+                                         force_norm=cfg.bopt_agent.gmm.force_norm,
+                                         logger=logger,
+                                         const_gripper_cmd=cfg.bopt_agent.gripper_command)
         print(f'Eval result:\n  Accuracy: {acc}\n  Mean returns: {returns}\n  Mean length: {lengths}')
     
     # Pos GMM result: 52%

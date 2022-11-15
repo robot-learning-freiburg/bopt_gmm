@@ -31,6 +31,7 @@ class BOPTAgentConfig:
     n_initial_points : int   = 10
     acq_func         : str   = 'gp_hedge'
     acq_optimizer    : str   = 'auto'
+    gripper_command  : float = 0.5
 
 
 class BOPTGMMAgentBase(object):
@@ -66,7 +67,7 @@ class BOPTGMMAgentBase(object):
 
     def predict(self, observation):
         observation = self.state.obs_transform(observation)
-        return {'motion': self.model.predict(observation).flatten(), 'gripper': -1.0}
+        return {'motion': self.model.predict(observation).flatten(), 'gripper': self.config.gripper_command}
 
     def step(self, prior_obs, posterior_obs, action, reward, done):
         if reward != 0:

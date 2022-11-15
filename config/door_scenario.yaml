@@ -5,15 +5,9 @@ defaults:
 bopt_agent:
   gmm: 
     model: "models/gmm/door_3p.npy"
-    # model: "models/gmm/peg_n_f_3p.npy"
-    # model: "models/gmm/peg_sawyer_3p.npy"
-    # model: "models/GMM/gmm_iai_peg_3_100.npy"
-    # model: peg_force_model_3_600.npy
-    # model: last_model_293524.09639436525.npy
-    # model: new_pos_gmm_3.npy
-    # model: peg_f_3.npy
     type: position
     force_norm: 1
+  gripper_command: 0.5
 
 show_gui: False
 
