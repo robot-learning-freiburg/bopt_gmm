@@ -1,0 +1,8 @@
+defaults:
+  - door_dbopt
+
+bopt_agent:
+  gmm:
+    model: "models/gmm/door_em_f_5p.npy"
+    type: force
+    force_norm: 2.6178633634847966e-05

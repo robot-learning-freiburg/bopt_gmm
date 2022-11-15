@@ -4,7 +4,7 @@ defaults:
 
 bopt_agent:
   gmm: 
-    model: "models/gmm/door_3p.npy"
+    model: "models/gmm/door_em_5p.npy"
     type: position
     force_norm: 1
   gripper_command: 0.5
