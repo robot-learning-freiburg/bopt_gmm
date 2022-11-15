@@ -4,7 +4,7 @@ open_threshold: 35 # Degrees
 
 door:
   path: package://bopt_gmm/objects/door.urdf
-  reference_link: handle_link
+  reference_link: base_link
   sampler:
     min: [0.7, -0.1, 0]
     max: [0.75, 0.1, 0]
