@@ -15,7 +15,7 @@ from bopt_gmm.utils import unpack_trajectories, \
                            normalize_trajectories
 
 if __name__ == '__main__':
-    parser = ArgumentParser(description='SEDS test')
+    parser = ArgumentParser(description='Generate GMMs from trajectory data')
     parser.add_argument('trajectories',  nargs='+',                  help='List of trajectories to fit to')
     parser.add_argument('--generator',   default='seds', type=str,   help='Choice of generation technique', choices=['seds', 'em'])
     parser.add_argument('--max-iter',    default=500,    type=int,   help='Maximum number of iterations for SEDS')

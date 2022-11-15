@@ -4,6 +4,9 @@ from subprocess import Popen
 
 
 def power_set(*args):
+    if len(args) == 0:
+        return []
+
     if len(args) == 1:
         return [(a, ) for a in args[0]]
     temp = power_set(*args[1:])
@@ -34,7 +37,7 @@ if __name__ == '__main__':
         if v[0] == '[':
             ps_args[k] = parse_list(v)
         else:
-            fixed_args[k] = v
+            ps_args[k] = [v]
 
     arg_names, values = zip(*list(ps_args.items()))
 
