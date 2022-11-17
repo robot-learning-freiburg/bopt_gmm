@@ -30,7 +30,7 @@ from .utils     import BoxSampler, \
 
 class DoorEnv(Env):
     def __init__(self, cfg, show_gui=False):
-        self.sim = BasicSimulator(cfg.action_frequency)
+        self.sim = BasicSimulator(cfg.action_frequency, use_egl=True)
         self.sim.init('gui' if show_gui else 'direct')
 
         self.dt        = 1 / cfg.action_frequency
@@ -77,6 +77,12 @@ class DoorEnv(Env):
         # self.controller     = CartesianRelativePointCOrientationController(self.robot, self.eef)
         self.controller     = CartesianRelativeVPointCOrientationController(self.robot, self.eef, 0.02)
 
+        self.render_camera  = PerspectiveCamera(self.sim, self.render_size[:2], 
+                                                50, 0.1, 10.0, 
+                                                Transform(Point3(-0.1, 0, 0.1), 
+                                                          Quaternion.from_euler(0, np.deg2rad(30), -np.deg2rad(60))).dot(Transform.from_xyz(-1.2, 0, 0.1)),
+                                                self.door)
+
         self._elapsed_steps = 0
 
     @property
@@ -100,6 +106,13 @@ class DoorEnv(Env):
         return DictSpace({'motion':  BoxSpace(-np.ones(3), np.ones(3)),
                           'gripper': BoxSpace(-1, 1, shape=(1,))})
 
+
+    @property
+    def render_size(self):
+        return (640, 480, 3)
+
+    def render(self, mode='rgb_array'):
+        return self.render_camera.rgb()
 
     def reset(self):
         if self.visualizer is not None:

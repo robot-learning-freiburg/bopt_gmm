@@ -1,3 +1,4 @@
+import cv2
 import hydra
 import numpy as np
 
@@ -67,9 +68,11 @@ def evaluate(env, model,
              render=False,
              force_norm=1.0,
              logger=None,
-             const_gripper_cmd=0.0):
+             data_dir=None,
+             const_gripper_cmd=0.0,
+             write_video=False):
     return evaluate_agent(env, AgentWrapper(model, force_norm, const_gripper_cmd), max_steps, 
-                          num_episodes, show_force, render, logger=logger)
+                          num_episodes, show_force, render, logger=logger, opt_model_dir=data_dir, write_video=write_video)
 
 
 @dataclass
@@ -92,7 +95,7 @@ class RunAccumulator:
 
 
 def evaluate_agent(env, agent, max_steps=2000, num_episodes=10, show_force=False, 
-                   render=False, logger=None, opt_model_dir=None, checkpoint_freq=10):
+                   render=False, logger=None, opt_model_dir=None, checkpoint_freq=10, write_video=False):
     successful_episodes, episodes_returns, episodes_lengths = 0, [], []
     agent_in_gp = False
     last_model_save = 0
@@ -115,6 +118,8 @@ def evaluate_agent(env, agent, max_steps=2000, num_episodes=10, show_force=False
     prev_bopt_step = 0
     ep_acc = RunAccumulator()
 
+    v_writer = None
+
     with tqdm(total=num_episodes, desc="Evaluating model") as pbar:
         while bopt_step < num_episodes:
             bopt_step = agent.get_bopt_step() if agent.has_gp_stage() else prev_bopt_step + 1
@@ -128,11 +133,25 @@ def evaluate_agent(env, agent, max_steps=2000, num_episodes=10, show_force=False
 
                 ep_acc = RunAccumulator()
 
+            if write_video and bopt_step != prev_bopt_step and opt_model_dir is not None:
+                if v_writer is not None:
+                    v_writer.release()
+
+                out_file =f'{opt_model_dir}/episode_{bopt_step}.mp4'
+                print(f'Video path: {out_file}')
+                v_writer = cv2.VideoWriter(out_file, 
+                                           cv2.VideoWriter.fourcc(*'mp4v'),
+                                           30.0,
+                                           env.render_size[:2])
+            else:
+                v_writer = None
+
             prev_bopt_step = bopt_step
 
             observation = env.reset()
             episode_return = 0
             
+
             for step in range(max_steps):
                 action = agent.predict(observation)
                 # print(observation)
@@ -154,12 +173,13 @@ def evaluate_agent(env, agent, max_steps=2000, num_episodes=10, show_force=False
                         agent.base_model.save_model(f'{opt_model_dir}/gmm_base.npy')
                     agent_in_gp = True
                 observation = post_observation
-                if opt_model_dir is not None and bopt_step - last_model_save >= checkpoint_freq:
+                if opt_model_dir is not None and bopt_step - last_model_save >= checkpoint_freq and agent.has_gp_stage():
                     agent.model.save_model(f'{opt_model_dir}/gmm_{bopt_step}.npy')
                     last_model_save = bopt_step
 
-                if render:
-                    env.render()
+                if v_writer is not None:
+                    rgb = env.render()
+                    v_writer.write(rgb)
                 
                 if done:
                     break
@@ -180,6 +200,9 @@ def evaluate_agent(env, agent, max_steps=2000, num_episodes=10, show_force=False
                 logger.log({'accuracy': accuracy, 
                             'success': int(info['success']),
                             'reward': episode_return, 'steps': step + 1})
+
+    if v_writer is not None:
+        v_writer.release()
 
     if opt_model_dir is not None:
         agent.model.save_model(f'{opt_model_dir}/gmm_final.npy')
@@ -361,6 +384,7 @@ if __name__ == '__main__':
     parser.add_argument('--mode', default='bopt-gmm', help='Modes to run the program in.', choices=['bopt-gmm', 'eval-gmm', 'vis'])
     parser.add_argument('--run-prefix', default=None, help='Prefix for the generated run-id for the logger')
     parser.add_argument('--wandb', action='store_true', help='Enable W&B logging.')
+    parser.add_argument('--video', action='store_true', help='Write video.')
     parser.add_argument('--model-dir', default=None, help='Directory to save models and data to. Will be created if non-existent')
     args = parser.parse_args()
 
@@ -408,7 +432,7 @@ if __name__ == '__main__':
     if args.mode == 'bopt-gmm':
         conf_hash = conf_checksum(cfg)
 
-        main_bopt_agent(env, cfg.bopt_agent, conf_hash, cfg.show_gui, args.wandb, args.run_prefix, args.model_dir)
+        main_bopt_agent(env, cfg.bopt_agent, conf_hash, cfg.show_gui, args.wandb, args.run_prefix, args.model_dir, write_video=args.video)
     elif args.mode == 'eval-gmm':
         if cfg.bopt_agent.gmm.type not in GMM_TYPES:
             print(f'Unknown GMM type {cfg.bopt_agent.gmm.type}. Options are: {GMM_TYPES.keys()}')
@@ -429,7 +453,9 @@ if __name__ == '__main__':
                                          show_force=cfg.show_gui,
                                          force_norm=cfg.bopt_agent.gmm.force_norm,
                                          logger=logger,
-                                         const_gripper_cmd=cfg.bopt_agent.gripper_command)
+                                         data_dir=args.model_dir,
+                                         const_gripper_cmd=cfg.bopt_agent.gripper_command,
+                                         write_video=args.video)
         print(f'Eval result:\n  Accuracy: {acc}\n  Mean returns: {returns}\n  Mean length: {lengths}')
     
     # Pos GMM result: 52%
