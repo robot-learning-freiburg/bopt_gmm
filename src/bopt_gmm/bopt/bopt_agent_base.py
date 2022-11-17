@@ -1,6 +1,6 @@
 import numpy as np
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime    import datetime
 from skopt       import Optimizer
 from typing      import Callable, Any, Iterable, Tuple
@@ -12,7 +12,7 @@ from bopt_gmm.logging import LoggerBase
 def base_success(prior_obs, posterior_obs, action, reward, done):
     return done and reward > 0
 
-def no_op(_, x):
+def no_op(x):
     return x
 
 
@@ -44,22 +44,22 @@ class BOPTGMMAgentBase(object):
     
     @dataclass
     class State:
-        n_step : int         = 0
-        trajectories         = [[]]
-        success_trajectories = []
-        gp_optimizer         = None
-        current_update       = None
-        bopt_state           = None
-        obs_transform        = no_op
+        n_step               : int  = 0
+        trajectories         : list = field(default_factory=lambda: [[]]) 
+        success_trajectories : list = field(default_factory=list) 
+        gp_optimizer         : Any  = None
+        current_update       : Any  = None
+        bopt_state           : Any  = None
+        obs_transform        : Any  = no_op
 
 
-    def __init__(self, base_gmm, config: BOPTAgentConfig, logger : LoggerBase=None) -> None:
+    def __init__(self, base_gmm, config: BOPTAgentConfig, obs_transform = no_op, logger : LoggerBase=None) -> None:
         self.base_model = base_gmm
         self.config     = config
         self.model      = base_gmm
         self.logger     = logger
 
-        self.state = BOPTGMMAgentBase.State()
+        self.state = BOPTGMMAgentBase.State(obs_transform=obs_transform)
 
         if self.logger is not None:
             self.logger.define_metric('bopt_x', BOPT_TIME_SCALE)

@@ -343,7 +343,15 @@ def main_bopt_agent(env, bopt_agent_config, conf_hash, show_force=True, wandb=Fa
                                     gripper_command=bopt_agent_config.gripper_command,
                                     base_accuracy=bopt_agent_config.base_accuracy)
 
-        agent  = BOPTGMMAgent(base_gmm, config, logger=logger)
+        if bopt_agent_config.gmm.type in {'force', 'torque'}:
+            def obs_transform_force_norm(obs):
+                if 'force' in obs:
+                    obs['force'] = obs['force'] * bopt_agent_config.gmm.force_norm
+                return obs
+
+            agent = BOPTGMMAgent(base_gmm, config, obs_transform_force_norm, logger=logger)
+        else:
+            agent = BOPTGMMAgent(base_gmm, config, logger=logger)
 
     acc, return_mean, mean_ep_length = evaluate_agent(env, agent, max_steps=600, num_episodes=200, 
                                                       show_force=show_force, logger=logger, opt_model_dir=model_dir)
