@@ -1,3 +1,5 @@
+type: peg
+
 action_frequency: 30
 
 board:

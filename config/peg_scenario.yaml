@@ -16,8 +16,6 @@ bopt_agent:
     force_norm: 1
   gripper_command: -1.0
 
-show_gui: False
-
 env:
   observation:
     with_noise: False

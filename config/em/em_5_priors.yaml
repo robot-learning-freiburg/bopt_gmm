@@ -1,0 +1,4 @@
+defaults:
+  - em_base
+
+n_priors: 5

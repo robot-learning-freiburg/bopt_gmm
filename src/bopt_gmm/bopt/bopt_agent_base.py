@@ -126,7 +126,7 @@ class BOPTGMMAgentBase(object):
                 break
             except ValueError:
                 self.state.gp_optimizer.tell(self.state.current_update, 0)
-                self.state.bopt_state.updates += 1
+                # self.state.bopt_state.updates += 1
         else:
             raise Exception(f'Repeated Bayesian Updates have failed to produce a valid update')
 

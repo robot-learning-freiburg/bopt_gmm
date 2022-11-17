@@ -1,5 +1,18 @@
 import dearpygui.dearpygui as dpg
 
+HAS_DPG_CONTEXT = False
+
+def create_dpg_context(width=900, height=450):
+    global HAS_DPG_CONTEXT
+    if not HAS_DPG_CONTEXT:
+        dpg.create_context()
+        dpg.create_viewport(title='Live Vis', width=900, height=450)
+        dpg.setup_dearpygui()
+        dpg.show_viewport()
+        HAS_DPG_CONTEXT = True
+
+is_dpg_running   = dpg.is_dearpygui_running
+render_dpg_frame = dpg.render_dearpygui_frame
 
 class LivePlot():
     def __init__(self, plot_name, values, n_points=1000):
