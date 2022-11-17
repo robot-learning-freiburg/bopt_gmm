@@ -1,0 +1,4 @@
+tol_cutting: 0.05
+max_iter: 600
+tol: 0.05
+n_init: 1

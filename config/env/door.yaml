@@ -1,3 +1,5 @@
+type: door
+
 action_frequency: 30
 
 open_threshold: 35 # Degrees
