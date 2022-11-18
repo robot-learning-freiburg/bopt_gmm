@@ -2,22 +2,8 @@ import sys
 
 from subprocess import Popen
 
-
-def power_set(*args):
-    if len(args) == 0:
-        return []
-
-    if len(args) == 1:
-        return [(a, ) for a in args[0]]
-    temp = power_set(*args[1:])
-    return sum([[(a, ) + t for t in temp] for a in args[0]], [])
-
-def parse_list(list_str, tf=str):
-    if list_str[0] != '[' or list_str[-1] != ']':
-        raise Exception(f'Expected list string to start with "[" and end with "]"')
-
-    return [tf(i) for i in list_str[1:-1].split(',')]
-
+from bopt_gmm.utils import power_set, \
+                           parse_list
 
 if __name__ == '__main__':
     args = sys.argv[1:]
