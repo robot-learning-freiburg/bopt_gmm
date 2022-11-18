@@ -170,7 +170,7 @@ def evaluate_agent(env, agent, num_episodes=100, max_steps=600,
         if info["success"]:
             successful_episodes += 1
             if verbose > 0:
-                print(f'Number of successes: {successful_episodes}\nCurrent Accuracy: {successful_episodes / ep}')
+                print(f'Number of successes: {successful_episodes}\nCurrent Accuracy: {successful_episodes / (ep + 1)}')
             
             if video_logger is not None:
                 video_logger.rename(f'eval_{ep:04d}_S')
