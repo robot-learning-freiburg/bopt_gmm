@@ -22,14 +22,22 @@ def gen_trajectory_from_transitions(transition_trajectories, deltaT):
 
 
 def conf_checksum(cfg):
-    return hashlib.md5(oc.OmegaConf.to_yaml(cfg).encode('utf-8')).hexdigest()[:6]
+    return hashlib.md5(inner_conf_checksum(cfg)).hexdigest()[:6]
 
 
-def flatten_conf(cfg, prefix='', include_path=False):
-    out = {}
-    if type(cfg) == oc.dictconfig.DictConfig:
-        for k, v in cfg:
-            pass
+def inner_conf_checksum(cfg):
+    if type(cfg) == oc.DictConfig:
+        if '_no_hash' in cfg and cfg['_no_hash']:
+            return 0
+        
+        return reduce(operator.xor, [hash(k) ^ (~inner_conf_checksum(cfg[k]) - 17) for v in cfg], 0)
+
+    elif type(cfg) == oc.ListConfig:
+        return reduce(operator.xor, [inner_conf_checksum(v) - x for v in cfg], 0)
+    elif type(cfg) == str and cfg[0] == '/':
+        return 0
+    else:
+        return hash(cfg)
 
 
 def list_of_dicts_to_dict(input: list) -> dict:

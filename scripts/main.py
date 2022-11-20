@@ -256,15 +256,6 @@ def main_bopt_agent(env, bopt_agent_config, conf_hash, show_force=True, wandb=Fa
 
     if bopt_agent_config.agent not in {'bopt-gmm', 'dbopt'}:
         raise Exception(f'Unkown agent type "{bopt_agent_config.agent}"')
-
-    if data_dir is not None:
-        data_dir = f'{data_dir}_{conf_hash}'
-        p = Path(data_dir)
-        if not p.exists():
-            p.mkdir(parents=True)
-
-        with open(f'{data_dir}/config.yaml', 'w') as cfile:
-            cfile.write(OmegaConf.to_yaml(bopt_agent_config))
     
     model_dir = f'{data_dir}/models' if data_dir is not None else None
     video_dir = f'{data_dir}/video'  if render_video         else None
@@ -376,6 +367,14 @@ if __name__ == '__main__':
     if args.mode == 'bopt-gmm':
         conf_hash = conf_checksum(cfg)
 
+        if args.data_dir is not None:
+            args.data_dir = f'{args.data_dir}_{conf_hash}'
+            p = Path(args.data_dir)
+            if not p.exists():
+                p.mkdir(parents=True)
+
+            with open(f'{args.data_dir}/config.yaml', 'w') as cfile:
+                cfile.write(OmegaConf.to_yaml(cfg))
 
         main_bopt_agent(env, cfg.bopt_agent, conf_hash, args.show_gui, 
                         args.wandb, args.run_prefix, 
