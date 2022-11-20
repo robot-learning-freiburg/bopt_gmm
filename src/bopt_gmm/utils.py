@@ -200,6 +200,23 @@ def calculate_trajectory_velocities(t : np.ndarray, delta_t):
     return np.hstack((t[1:], (t[1:] - t[:-1]) / delta_t))
 
 
+def power_set(*args):
+    if len(args) == 0:
+        return []
+
+    if len(args) == 1:
+        return [(a, ) for a in args[0]]
+    temp = power_set(*args[1:])
+    return sum([[(a, ) + t for t in temp] for a in args[0]], [])
+
+
+def parse_list(list_str, tf=str):
+    if list_str[0] != '[' or list_str[-1] != ']':
+        raise Exception(f'Expected list string to start with "[" and end with "]"')
+
+    return [tf(i) for i in list_str[1:-1].split(',')]
+
+
 if __name__ == '__main__':
     import hydra
 
