@@ -1,5 +1,6 @@
 import hashlib 
 import operator
+import struct
 import omegaconf as oc
 import numpy     as np
 
@@ -22,7 +23,7 @@ def gen_trajectory_from_transitions(transition_trajectories, deltaT):
 
 
 def conf_checksum(cfg):
-    return hashlib.md5(inner_conf_checksum(cfg)).hexdigest()[:6]
+    return hashlib.md5(struct.pack("l", inner_conf_checksum(cfg))).hexdigest()[:6]
 
 
 def inner_conf_checksum(cfg):
@@ -30,10 +31,9 @@ def inner_conf_checksum(cfg):
         if '_no_hash' in cfg and cfg['_no_hash']:
             return 0
         
-        return reduce(operator.xor, [hash(k) ^ (~inner_conf_checksum(cfg[k]) - 17) for v in cfg], 0)
-
+        return reduce(operator.xor, [hash(k) ^ (~inner_conf_checksum(cfg[k]) - 17) for k in cfg], 0)
     elif type(cfg) == oc.ListConfig:
-        return reduce(operator.xor, [inner_conf_checksum(v) - x for v in cfg], 0)
+        return reduce(operator.xor, [inner_conf_checksum(v) - x for x, v in enumerate(cfg)], 0)
     elif type(cfg) == str and cfg[0] == '/':
         return 0
     else:

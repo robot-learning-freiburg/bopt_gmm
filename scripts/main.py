@@ -379,6 +379,7 @@ if __name__ == '__main__':
         main_bopt_agent(env, cfg.bopt_agent, conf_hash, args.show_gui, 
                         args.wandb, args.run_prefix, 
                         args.data_dir, render_video=args.video)
+
     elif args.mode == 'eval-gmm':
         if cfg.bopt_agent.gmm.type not in GMM_TYPES:
             print(f'Unknown GMM type {cfg.bopt_agent.gmm.type}. Options are: {GMM_TYPES.keys()}')
