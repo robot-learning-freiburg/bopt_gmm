@@ -2,6 +2,7 @@ import numpy as np
 
 from dataclasses import dataclass, field
 from datetime    import datetime
+from itertools   import product
 from skopt       import Optimizer
 from typing      import Callable, Any, Iterable, Tuple
 
@@ -23,6 +24,7 @@ class BOPTAgentConfig:
     f_success        : Callable[[Any, Any, Any, float, bool], bool] = base_success
     prior_range      : float = 0.15
     mean_range       : float = 0.05
+    sigma_range      : float = 0.0
     early_tell       : int   = 5
     late_tell        : int   = 100000
     reward_processor : str   = 'mean'    # mean, raw
@@ -70,14 +72,12 @@ class BOPTGMMAgentBase(object):
         return {'motion': self.model.predict(observation).flatten(), 'gripper': self.config.gripper_command}
 
     def step(self, prior_obs, posterior_obs, action, reward, done):
-        if reward != 0:
-            print(f'Reward! {reward}')
         transition = (prior_obs, posterior_obs, action, reward, done)
         self.state.n_step += 1
         self.state.trajectories[-1].append(transition)
         if self.config.f_success(*transition):
             self.state.success_trajectories.append(self.state.trajectories[-1])
-            print(f'Collected a a successful trajectory. Now got {len(self.state.success_trajectories)}')
+            # print(f'Collected a successful trajectory. Now got {len(self.state.success_trajectories)}')
         if done:
             self.state.trajectories.append([])
             
@@ -89,8 +89,16 @@ class BOPTGMMAgentBase(object):
         self.state.bopt_state    = BOPTGMMAgentBase.BOPTState()
         self.state.base_accuracy = base_accuracy if base_accuracy is not None else len(self.state.success_trajectories) / len(self.state.trajectories)
 
-        self.state.gp_optimizer  = Optimizer([(-self.config.prior_range, self.config.prior_range)] * self.base_model.n_priors + 
-                                             [(-self.config.mean_range, self.config.mean_range)] * self.base_model.n_priors * self.base_model.n_dims,
+        optim_params = []
+        if self.config.prior_range != 0.0:
+            optim_params += [(-self.config.prior_range, self.config.prior_range)] * self.base_model.n_priors
+        if self.config.mean_range != 0.0:
+            optim_params += [(-self.config.mean_range, self.config.mean_range)] * self.base_model.n_priors * self.base_model.n_dims
+        if self.config.sigma_range != 0.0:
+            optim_params += [(-self.config.sigma_range, self.config.sigma_range)] * (len(self.base_model.state_dim) * len(self.base_model.prediction_dim) * self.base_model.n_priors)
+            self._cvar_indices = list(zip(*product(range(self.base_model.n_priors), self.base_model.state_dim, self.base_model.prediction_dim)))
+
+        self.state.gp_optimizer  = Optimizer(optim_params,
                                              base_estimator=self.config.base_estimator,
                                              n_initial_points=self.config.n_initial_points,
                                              initial_point_generator=self.config.initial_p_gen,
@@ -116,16 +124,41 @@ class BOPTGMMAgentBase(object):
             try:
                 self.state.current_update = self.state.gp_optimizer.ask()
 
-                mu = self.base_model.mu()
-                mu_space = mu.max(axis=0) - mu.min(axis=0)
+                start_idx = 0
+                if self.config.prior_range != 0.0:
+                    u_priors   = self.state.current_update[start_idx:self.base_model.n_priors]
+                    start_idx += self.base_model.n_priors
+                else:
+                    u_priors = None
 
-                self.model = self.base_model.update_gaussian(self.state.current_update[:self.base_model.n_priors], 
-                                                            np.asarray(self.state.current_update[self.base_model.n_priors:]).reshape(mu.shape) * mu_space)
+                if self.config.mean_range != 0.0:
+                    mu         = self.base_model.mu()
+                    mu_space   = mu.max(axis=0) - mu.min(axis=0)
+                    u_mean     = np.asarray(self.state.current_update[start_idx:start_idx + mu.size]).reshape(mu.shape) * mu_space
+                    start_idx += mu.size
+                else:
+                    u_mean = None
+
+                if self.config.sigma_range != 0.0:
+                    sigma       = self.base_model.sigma()
+                    sigma_space = sigma.max(axis=0) - sigma.min(axis=0)
+                    unit_update = np.zeros_like(sigma)
+                    unit_update[self._cvar_indices[0], 
+                                self._cvar_indices[1], 
+                                self._cvar_indices[2]] = self.state.current_update[start_idx:start_idx + len(self._cvar_indices) * len(self._cvar_indices[0])]
+                    unit_update *= sigma_space
+
+                    u_sigma = unit_update[self.base_model._cvar_tril_idx]
+                else:
+                    u_sigma = None
+
+                self.model = self.base_model.update_gaussian(u_priors, u_mean, u_sigma)
                 
-                print(f'Updated Model:\nPriors: {self.model.pi()}\nMu: {self.model.mu()}')
+                print(f'Updated Model:\nPriors: {self.model.pi()}\nMu: {self.model.mu()}\nSigma-Delta: {u_sigma}')
                 break
-            except ValueError:
-                self.state.gp_optimizer.tell(self.state.current_update, 0)
+            except ValueError as e:
+                pass
+                # self.state.gp_optimizer.tell(self.state.current_update, 0)
                 # self.state.bopt_state.updates += 1
         else:
             raise Exception(f'Repeated Bayesian Updates have failed to produce a valid update')

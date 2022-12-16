@@ -71,7 +71,7 @@ class GMMCart3DForce(GMM):
 
     @property
     def prediction_dim(self):
-        return [6, 7, 8, 9, 10, 11]
+        return [6, 7, 8] #, 9, 10, 11]
 
 
 class GMMCart3DTorque(GMMCart3DForce):

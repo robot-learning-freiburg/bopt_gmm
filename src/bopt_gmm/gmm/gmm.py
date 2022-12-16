@@ -2,6 +2,7 @@ import sys
 import numpy as np
 
 from argparse    import ArgumentError
+from functools   import lru_cache
 from itertools   import cycle
 from pathlib     import Path
 from random      import random
@@ -129,6 +130,12 @@ class GMM(object):
             p_mean += weights[k] * aux
         return p_mean
 
+    @property
+    @lru_cache(1)
+    def _cvar_tril_idx(self):
+        temp = np.vstack(np.tril_indices(self._cvar.shape[1]))
+        return tuple(np.hstack([np.vstack(([i] * temp.shape[1], temp)) for i in range(self.n_priors)]))
+
 
     def update_gaussian(self, priors=None, mu=None, sigma=None):
         """Returns a new GMM updated with the given deltas
@@ -157,13 +164,11 @@ class GMM(object):
             new_mu = self._means
 
         if sigma is not None:
-            cov_size = self._cvar.shape[1]
-
-            tril_idx = zip(*[(np.repeat(x, len(i[0])),) + i for x, i in zip(range(len(self._priors)), cycle(np.tril_indices(cov_size)))])
+            tril_idx = self._cvar_tril_idx
 
             sigma_mat = np.zeros(self._cvar.shape)
             sigma_mat[tril_idx]   = sigma
-            sigma_mat.T[tril_idx] = sigma
+            np.transpose(sigma_mat, [0, 2, 1])[tril_idx] = sigma
 
             new_sigma = self._cvar + sigma_mat
             for x in range(new_sigma.shape[0]):
