@@ -1,4 +1,7 @@
 import sys
+import os
+import time
+import signal 
 
 from subprocess import Popen
 
@@ -8,9 +11,14 @@ from bopt_gmm.utils import power_set, \
 if __name__ == '__main__':
     args = sys.argv[1:]
     
-    for x in range(len(args)):
-        if args[x] == '--overrides':
-            break
+    try:
+        i_nproc = args.index('--n-proc') + 1
+        nproc   = int(args[i_nproc])
+        args    = args[i_nproc + 1:]
+    except ValueError:
+        nproc = 100
+
+    x = args.index('--overrides')
     
     p_args    = args[:x]
     overrides = args[x+1:]
@@ -30,19 +38,40 @@ if __name__ == '__main__':
     arg_sets = power_set(*values)
     print(arg_sets)
 
-
     fixed_args = [f'{k}={v}' for k, v in fixed_args.items()]
 
-    processes = [Popen(['python'] + p_args + ['--overrides'] + [f'{k}={a}' for k, a in zip(arg_names, aset)] + fixed_args) for aset in arg_sets]
-
-    print(f'Launched {len(processes)} processes. Arguments are:')
+    tasks = [(['python'] + p_args + ['--overrides'] + [f'{k}={a}' for k, a in zip(arg_names, aset)] + fixed_args) for aset in arg_sets]
     
-    for argset in arg_sets:
-        print('\n'.join(f'{a}={v}' for a, v in zip(arg_names, argset)))
+    processes = []
 
-    print('Waiting for their completion...')
+    def sig_handler(sig, *args):
+        print('Received SIGINT. Killing subprocesses...')
+        for p in processes:
+            p.send_signal(signal.SIGINT)
+        
+        for p in processes:
+            p.wait()
+        sys.exit(0)
 
-    for p in processes:
-        p.wait()
+    signal.signal(signal.SIGINT, sig_handler)
 
+    with open(os.devnull, 'w') as devnull:
+        while len(tasks) > 0:
+            while len(processes) < nproc and len(tasks) > 0:
+                processes.append(Popen(tasks[0], stdout=devnull))
+                print(f'Launched task "{" ".join(tasks[0])}"\nRemaining {len(tasks) - 1}')
+                tasks = tasks[1:]
+
+            time.sleep(1.0)
+
+            tidx = 0
+            while tidx < len(processes):
+                if processes[tidx].poll() is not None:
+                    del processes[tidx]
+                else:
+                    tidx += 1
+
+        print('Waiting for their completion...')
+        for p in processes:
+            p.wait()
     print('Done')
