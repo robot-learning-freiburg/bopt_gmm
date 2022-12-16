@@ -5,3 +5,4 @@ from .live_plot    import LivePlot, \
                           is_dpg_running, \
                           render_dpg_frame
 from .video_logger import MP4VideoLogger
+from .csv_logger   import CSVLogger

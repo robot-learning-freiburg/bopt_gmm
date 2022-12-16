@@ -23,7 +23,8 @@ def gen_trajectory_from_transitions(transition_trajectories, deltaT):
 
 
 def conf_checksum(cfg):
-    return hashlib.md5(struct.pack("l", inner_conf_checksum(cfg))).hexdigest()[:6]
+    return hashlib.md5(oc.OmegaConf.to_yaml(cfg).encode('utf-8')).hexdigest()[:6]
+    # return hashlib.md5(struct.pack("l", inner_conf_checksum(cfg))).hexdigest()[:6]
 
 
 def inner_conf_checksum(cfg):

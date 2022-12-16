@@ -33,7 +33,8 @@ from bopt_gmm.logging import WBLogger, \
                              create_dpg_context, \
                              is_dpg_running, \
                              render_dpg_frame, \
-                             MP4VideoLogger
+                             MP4VideoLogger, \
+                             CSVLogger
 
 from bopt_gmm.envs import PegEnv, \
                           DoorEnv
@@ -47,7 +48,9 @@ class AgentWrapper(object):
         self._gripper_command = gripper_command
 
     def predict(self, obs):
-        if 'force' in obs:
+        if callable(self._force_norm):
+            obs = self._force_norm(obs)
+        elif 'force' in obs:
             obs['force'] = obs['force'] * self._force_norm
         return {'motion': self._model.predict(obs).flatten(), 'gripper': self._gripper_command}
 
@@ -88,6 +91,8 @@ def run_episode(env, agent, max_steps, post_step_hook=None):
     observation    = env.reset()
     episode_return = 0.0
 
+    initial_conditions = env.config_dict()
+
     for step in range(max_steps):
         action = agent.predict(observation)
         # print(observation)
@@ -103,6 +108,8 @@ def run_episode(env, agent, max_steps, post_step_hook=None):
         if done:
             break
     
+    info['initial_conditions'] = initial_conditions
+
     return episode_return, step, info
 
 
@@ -142,7 +149,8 @@ def gen_force_logger_and_hook():
 
 
 def evaluate_agent(env, agent, num_episodes=100, max_steps=600, 
-                   logger=None, video_dir=None, trajectory_dir=None, show_forces=False, verbose=0):
+                   logger=None, video_dir=None, trajectory_dir=None, 
+                   show_forces=False, verbose=0, initial_conditions_path=None):
     episode_returns = []
     episode_lengths = []
     
@@ -152,6 +160,14 @@ def evaluate_agent(env, agent, num_episodes=100, max_steps=600,
         live_plot, live_plot_hook = gen_force_logger_and_hook()
     else:
         live_plot_hook = None
+
+    if initial_conditions_path is not None:
+        fields = env.config_space
+        fields += ['episode', 'accuracy', 'steps', 'reward', 'success']
+
+        ic_logger = CSVLogger(initial_conditions_path, fields)
+    else:
+        ic_logger = None
 
     video_logger = None
 
@@ -179,12 +195,20 @@ def evaluate_agent(env, agent, num_episodes=100, max_steps=600,
 
         accuracy = successful_episodes / (ep + 1)
 
+        stats = {'accuracy': accuracy, 
+                 'success': int(info['success']),
+                 'reward': ep_return, 
+                 'steps': step + 1}
+
         if logger is not None:
-            logger.log({'accuracy': accuracy, 
-                        'success': int(info['success']),
-                        'reward': ep_return, 
-                        'steps': step + 1})
-    
+            logger.log(stats)
+        
+        if ic_logger is not None:
+            ic = info['initial_conditions']
+            ic.update(stats)
+            ic['episode'] = ep
+            ic_logger.log(ic)
+
     if verbose > 0:
         print(f'Evaluation result:\n  Accuracy: {acc}\n  Mean returns: {np.mean(returns)}\n  Mean length: {np.mean(lengths)}')
 
@@ -192,11 +216,23 @@ def evaluate_agent(env, agent, num_episodes=100, max_steps=600,
 
 
 def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10, 
-                  opt_model_dir=None, logger=None, video_dir=None, show_force=False):
+                  opt_model_dir=None, logger=None, video_dir=None, 
+                  show_force=False, deep_eval_length=0):
     if logger is not None:
         logger.define_metric('bopt accuracy',   BOPT_TIME_SCALE)
         logger.define_metric('bopt reward',     BOPT_TIME_SCALE)
         logger.define_metric('bopt mean steps', BOPT_TIME_SCALE)
+        if deep_eval_length > 0:
+            logger.define_metric('bopt deep eval accuracy', BOPT_TIME_SCALE)
+
+    if opt_model_dir is not None:
+        fields = env.config_space
+        fields += ['bopt_step', 'substep', 'steps', 'success']
+
+        # Fix location generation
+        ic_logger = CSVLogger(f'{opt_model_dir}/../bopt_initial_conditions.csv', fields)
+    else:
+        ic_logger = None
 
     if show_force:
         live_plot, live_plot_hook = gen_force_logger_and_hook()
@@ -213,6 +249,28 @@ def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10,
             
             if bopt_step % checkpoint_freq == 0:
                 agent.model.save_model(f'{opt_model_dir}/gmm_{bopt_step}.npy')
+        
+        # 
+        if bopt_step > 0 and bopt_step % checkpoint_freq == 0 and deep_eval_length > 0:
+            eval_video_dir = f'{video_dir}/eval_{bopt_step}' if video_dir is not None else None
+            if eval_video_dir is not None and not Path(eval_video_dir).exists():
+                Path(eval_video_dir).mkdir(parents=True)
+
+            # Fix location generation
+            eval_ic_path = f'{opt_model_dir}/../eval_{bopt_step}_ic.csv' if opt_model_dir is not None else None
+
+            eval_agent = AgentWrapper(agent.model, 
+                                      agent.state.obs_transform, 
+                                      agent.config.gripper_command)
+
+            e_acc, _, _ = evaluate_agent(env, eval_agent,
+                                         num_episodes=deep_eval_length,
+                                         max_steps=max_steps,
+                                         video_dir=eval_video_dir,
+                                         verbose=0,
+                                         initial_conditions_path=eval_ic_path)
+            
+            logger.log({'bopt deep eval accuracy': e_acc})
 
         # Setup post-step hooks  
         post_step_hooks = [post_step_hook_bopt]
@@ -224,10 +282,23 @@ def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10,
             post_step_hooks.append(video_hook)
 
         # Collecting data for next BOPT update
+        sub_ep_idx = 0
         while agent.get_bopt_step() == bopt_step:
             ep_return, step, info = run_episode(env, agent, max_steps, post_step_hook=post_step_hook_dispatcher(*post_step_hooks))
             ep_acc.log_run(step + 1, ep_return, info['success'])
-        
+            if ic_logger is not None:
+                ic = info['initial_conditions']
+                ic.update({'bopt_step': bopt_step, 
+                           'substep': sub_ep_idx, 
+                           'steps' : step + 1, 
+                           'success': info['success']})
+                ic_logger.log(ic)
+            sub_ep_idx += 1
+
+        if video_dir is not None:
+            _, _, bopt_accuracy = ep_acc.get_stats()
+            video_logger.rename(f'bopt_{bopt_step:04d}_{bopt_accuracy:1.3f}')
+
         # Log results of execution from this step
         if logger is not None:
             bopt_mean_steps, bopt_reward, bopt_accuracy = ep_acc.get_stats()
@@ -252,7 +323,9 @@ def load_gmm(gmm_config):
     return GMM_TYPES[gmm_config.type].load_model(gmm_config.model)
 
 
-def main_bopt_agent(env, bopt_agent_config, conf_hash, show_force=True, wandb=False, log_prefix=None, data_dir=None, render_video=False):
+def main_bopt_agent(env, bopt_agent_config, conf_hash, 
+                    show_force=True, wandb=False, log_prefix=None, 
+                    data_dir=None, render_video=False, deep_eval_length=0):
 
     if bopt_agent_config.agent not in {'bopt-gmm', 'dbopt'}:
         raise Exception(f'Unkown agent type "{bopt_agent_config.agent}"')
@@ -296,6 +369,7 @@ def main_bopt_agent(env, bopt_agent_config, conf_hash, show_force=True, wandb=Fa
 
         config = BOPTAgentGenGMMConfig(prior_range=bopt_agent_config.prior_range,
                                        mean_range=bopt_agent_config.mean_range,
+                                       sigma_range=bopt_agent_config.sigma_range,
                                        early_tell=bopt_agent_config.early_tell,
                                        late_tell=bopt_agent_config.late_tell,
                                        reward_processor=bopt_agent_config.reward_processor,
@@ -315,6 +389,7 @@ def main_bopt_agent(env, bopt_agent_config, conf_hash, show_force=True, wandb=Fa
     elif bopt_agent_config.agent == 'dbopt':
         config = BOPTAgentGMMConfig(prior_range=bopt_agent_config.prior_range,
                                     mean_range=bopt_agent_config.mean_range,
+                                    sigma_range=bopt_agent_config.sigma_range,
                                     early_tell=bopt_agent_config.early_tell,
                                     late_tell=bopt_agent_config.late_tell,
                                     reward_processor=bopt_agent_config.reward_processor,
@@ -336,12 +411,13 @@ def main_bopt_agent(env, bopt_agent_config, conf_hash, show_force=True, wandb=Fa
         else:
             agent = BOPTGMMAgent(base_gmm, config, logger=logger)
 
-    acc, return_mean, mean_ep_length = bopt_training(env, agent, num_episodes=200, max_steps=600, 
-                                                     opt_model_dir=model_dir, logger=logger, 
-                                                     video_dir=video_dir, show_force=show_force)
-    print(f'Accuracy: {acc} Mean return: {return_mean} Mean ep length: {mean_ep_length}')
-    bopt_res = agent.state.gp_optimizer.get_result()
-    print(f'F means: {bopt_res.x}\nReward: {bopt_res.fun}')
+    bopt_training(env, agent, num_episodes=100, max_steps=600, 
+                  opt_model_dir=model_dir, logger=logger, 
+                  video_dir=video_dir, show_force=show_force, 
+                  deep_eval_length=deep_eval_length)
+    # print(f'Accuracy: {acc} Mean return: {return_mean} Mean ep length: {mean_ep_length}')
+    # bopt_res = agent.state.gp_optimizer.get_result()
+    # print(f'F means: {bopt_res.x}\nReward: {bopt_res.fun}')
 
 
 
@@ -355,6 +431,7 @@ if __name__ == '__main__':
     parser.add_argument('--wandb', action='store_true', help='Enable W&B logging.')
     parser.add_argument('--video', action='store_true', help='Write video.')
     parser.add_argument('--show-gui', action='store_true', help='Show interactive GUI')
+    parser.add_argument('--deep-eval', default=0, type=int, help='Number of deep evaluation episodes to perform during bopt training.')
     parser.add_argument('--data-dir', default=None, help='Directory to save models and data to. Will be created if non-existent')
     args = parser.parse_args()
 
@@ -378,7 +455,8 @@ if __name__ == '__main__':
 
         main_bopt_agent(env, cfg.bopt_agent, conf_hash, args.show_gui, 
                         args.wandb, args.run_prefix, 
-                        args.data_dir, render_video=args.video)
+                        args.data_dir, render_video=args.video, 
+                        deep_eval_length=args.deep_eval)
 
     elif args.mode == 'eval-gmm':
         if cfg.bopt_agent.gmm.type not in GMM_TYPES:

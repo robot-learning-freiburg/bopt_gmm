@@ -86,6 +86,20 @@ class DoorEnv(Env):
         self._elapsed_steps = 0
 
     @property
+    def config_space(self):
+        return sum([[f'{k}_noise_{x}' for x in 'xyz'] for k in self.noise_samplers.keys()], []) + \
+                    [f'door_pose_{x}' for x in 'x,y,z,qx,qy,qz,qw'.split(',')] + \
+                    [f'ee_pose_{x}' for x in 'x,y,z,qx,qy,qz,qw'.split(',')]
+
+    def config_dict(self):
+        out = {} 
+        for k, n in self.noise_samplers.items(): 
+            out.update(dict(zip([f'{k}_noise_{x}' for x in 'xyz'], n.sample())))
+        out.update(dict(zip([f'door_pose_{x}' for x in 'x,y,z,qx,qy,qz,qw'.split(',')], self.door.pose.array())))
+        out.update(dict(zip([f'ee_pose_{x}' for x in 'x,y,z,qx,qy,qz,qw'.split(',')], self.eef.pose.array())))
+        return out
+
+    @property
     def visualizer(self):
         return self.sim.visualizer
 
@@ -147,8 +161,6 @@ class DoorEnv(Env):
             reset_controller.act(x_goal)
             self._set_gripper_absolute_goal(0.5)
             self.sim.update()
-
-        print('End of reset')
 
         self.controller.reset()
 
