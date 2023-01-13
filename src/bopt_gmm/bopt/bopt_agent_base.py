@@ -148,7 +148,8 @@ class BOPTGMMAgentBase(object):
                                 self._cvar_indices[2]] = self.state.current_update[start_idx:start_idx + len(self._cvar_indices) * len(self._cvar_indices[0])]
                     unit_update *= sigma_space
 
-                    u_sigma = unit_update[self.base_model._cvar_tril_idx]
+                    # Transpose to accomodate lower triangle indices
+                    u_sigma = np.transpose(unit_update, [0, 2, 1])[self.base_model._cvar_tril_idx]
                 else:
                     u_sigma = None
 
