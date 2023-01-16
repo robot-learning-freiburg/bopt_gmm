@@ -7,6 +7,7 @@ from ConfigSpace                import ConfigurationSpace
 from ConfigSpace                import UniformFloatHyperparameter
 from dataclasses                import dataclass
 from datetime                   import datetime
+from math                       import inf as Infinity
 from omegaconf                  import OmegaConf
 from pathlib                    import Path
 from skopt                      import gp_minimize
@@ -19,6 +20,8 @@ from bopt_gmm.bopt import BOPTGMMCollectAndOptAgent, \
                           BOPTAgentGMMConfig,        \
                           BOPTAgentGenGMMConfig,     \
                           BOPT_TIME_SCALE
+import bopt_gmm.bopt.regularization as reg
+                          
 from bopt_gmm.gmm import GMMCart3D,       \
                          GMMCart3DForce,  \
                          GMMCart3DTorque, \
@@ -28,7 +31,8 @@ from bopt_gmm.gmm import GMMCart3D,       \
 from bopt_gmm.gmm.generation import seds_gmm_generator, \
                                     em_gmm_generator
 
-from bopt_gmm.utils   import conf_checksum
+from bopt_gmm.utils   import conf_checksum, \
+                             unpack_trajectories
 from bopt_gmm.logging import WBLogger, \
                              BlankLogger, \
                              LivePlot, \
@@ -314,21 +318,107 @@ def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10,
         agent.model.save_model(f'{opt_model_dir}/gmm_final.npy')
 
 
-ENV_TYPES = {'door': DoorEnv,
-             'peg': PegEnv}
+def bopt_regularized_training(env, agent, reg_data, regularizer, 
+                              num_episodes, min_reg_value=0,
+                              max_steps=600, checkpoint_freq=10, 
+                              opt_model_dir=None, logger=None, video_dir=None, 
+                              show_force=False, deep_eval_length=0):
+    if logger is not None:
+        logger.define_metric('bopt accuracy',   BOPT_TIME_SCALE)
+        logger.define_metric('bopt reward',     BOPT_TIME_SCALE)
+        logger.define_metric('bopt mean steps', BOPT_TIME_SCALE)
+        if deep_eval_length > 0:
+            logger.define_metric('bopt deep eval accuracy', BOPT_TIME_SCALE)
 
-GMM_TYPES = {'position': GMMCart3D,
-                'force': GMMCart3DForce,
-               'torque': GMMCart3DTorque}
+    if opt_model_dir is not None:
+        fields = env.config_space
+        fields += ['bopt_step', 'substep', 'steps', 'success']
 
+        # Fix location generation
+        ic_logger = CSVLogger(f'{opt_model_dir}/../bopt_initial_conditions.csv', fields)
+    else:
+        ic_logger = None
 
-def load_gmm(gmm_config):
-    return GMM_TYPES[gmm_config.type].load_model(gmm_config.model)
+    if show_force:
+        live_plot, live_plot_hook = gen_force_logger_and_hook()
+    else:
+        live_plot_hook = None
+
+    def post_step_hook_bopt_reg(_, env, agent, obs, post_obs, action, reward, done, info):
+        reg_val = regularizer(agent.model, agent.base_model, reg_data) if done else 0
+        post_step_hook_bopt(_, env, agent, obs, post_obs, action, reward + reg_val, done, info)
+
+    for n_ep in tqdm(range(num_episodes), desc="Training regularized BOPT model"):
+        ep_acc = RunAccumulator()
+        
+        # Save initial model and models every n-opts
+        if opt_model_dir is not None:
+            if agent.is_in_gp_stage() and bopt_step == 1:
+                agent.base_model.save_model(f'{opt_model_dir}/gmm_base.npy')
+            
+            if n_ep % checkpoint_freq == 0:
+                agent.model.save_model(f'{opt_model_dir}/gmm_{n_ep}.npy')
+        
+        # 
+        if n_ep > 0 and n_ep % checkpoint_freq == 0 and deep_eval_length > 0:
+            # Fix location generation
+            eval_ic_path = f'{opt_model_dir}/../eval_{n_ep}_ic.csv' if opt_model_dir is not None else None
+
+            eval_agent = AgentWrapper(agent.model, 
+                                      agent.state.obs_transform, 
+                                      agent.config.gripper_command)
+
+            e_acc, _, _ = evaluate_agent(env, eval_agent,
+                                         num_episodes=deep_eval_length,
+                                         max_steps=max_steps,
+                                         verbose=0,
+                                         initial_conditions_path=eval_ic_path)
+            
+            logger.log({'bopt deep eval accuracy': e_acc})
+
+        for tries in range(1000):
+            reg_val = regularizer(agent.model, agent.base_model, reg_data)
+            if min_reg_value <= reg_val:
+                break
+            
+            agent.step_optimizer(reg_val)
+        else:
+            raise Exception(f'Failed to generate a feasible update complying with regularization in {tries} attempts')
+
+        # Setup post-step hooks  
+        post_step_hooks = [post_step_hook_bopt_reg]
+
+        # Collecting data for next BOPT update
+        ep_return, step, info = run_episode(env, agent, max_steps, post_step_hook=post_step_hook_dispatcher(*post_step_hooks))
+        ep_acc.log_run(step + 1, ep_return, info['success'])
+        if ic_logger is not None:
+            ic = info['initial_conditions']
+            ic.update({'bopt_step': agent.get_bopt_step(), 
+                       'substep'  : 1, 
+                       'steps'    : step + 1, 
+                       'success'  : info['success']})
+            ic_logger.log(ic)
+
+        # if video_dir is not None:
+        #     _, _, bopt_accuracy = ep_acc.get_stats()
+        #     video_logger.rename(f'bopt_{bopt_step:04d}_{bopt_accuracy:1.3f}')
+
+        # Log results of execution from this step
+        if logger is not None:
+            bopt_mean_steps, bopt_reward, bopt_accuracy = ep_acc.get_stats()
+            logger.log({'bopt mean steps': bopt_mean_steps,
+                        'bopt reward'    : bopt_reward, 
+                        'bopt accuracy'  : bopt_accuracy})
+
+    # Save final model
+    if opt_model_dir is not None:
+        agent.model.save_model(f'{opt_model_dir}/gmm_final.npy')
+
 
 
 def main_bopt_agent(env, bopt_agent_config, conf_hash, 
                     show_force=True, wandb=False, log_prefix=None, 
-                    data_dir=None, render_video=False, deep_eval_length=0):
+                    data_dir=None, render_video=False, deep_eval_length=0, trajectories=None):
 
     if bopt_agent_config.agent not in {'bopt-gmm', 'dbopt'}:
         raise Exception(f'Unkown agent type "{bopt_agent_config.agent}"')
@@ -414,10 +504,19 @@ def main_bopt_agent(env, bopt_agent_config, conf_hash,
         else:
             agent = BOPTGMMAgent(base_gmm, config, logger=logger)
 
-    bopt_training(env, agent, num_episodes=100, max_steps=600, 
-                  opt_model_dir=model_dir, logger=logger, 
-                  video_dir=video_dir, show_force=show_force, 
-                  deep_eval_length=deep_eval_length)
+    if 'regularizer' not in bopt_agent_config:
+        bopt_training(env, agent, num_episodes=100, max_steps=600, 
+                      opt_model_dir=model_dir, logger=logger, 
+                      video_dir=video_dir, show_force=show_force, 
+                      deep_eval_length=deep_eval_length)
+    else:
+        regularizer = reg.gen_regularizer(bopt_agent_config.regularizer)
+        bopt_regularized_training(env, agent, np.vstack(trajectories), regularizer, 
+                                  min_reg_value=bopt_agent_config.regularizer.min_val,
+                                  num_episodes=100, max_steps=600, 
+                                  opt_model_dir=model_dir, logger=logger, 
+                                  video_dir=video_dir, show_force=show_force, 
+                                  deep_eval_length=deep_eval_length)
     # print(f'Accuracy: {acc} Mean return: {return_mean} Mean ep length: {mean_ep_length}')
     # bopt_res = agent.state.gp_optimizer.get_result()
     # print(f'F means: {bopt_res.x}\nReward: {bopt_res.fun}')
@@ -428,7 +527,7 @@ if __name__ == '__main__':
     parser = ArgumentParser(description='Using hydra without losing control of your code.')
     parser.add_argument('hy', type=str, help='Hydra config to use. Relative to root of "config" dir')
     parser.add_argument('--overrides', default=[], type=str, nargs='*', help='Overrides for hydra config')
-    parser.add_argument('--trajectories', default=None, help='Trajectories to fit a new GMM to')
+    parser.add_argument('--trajectories', default=[], nargs='*', help='Trajectories to use for regularization')
     parser.add_argument('--mode', default='bopt-gmm', help='Modes to run the program in.', choices=['bopt-gmm', 'eval-gmm', 'vis'])
     parser.add_argument('--run-prefix', default=None, help='Prefix for the generated run-id for the logger')
     parser.add_argument('--wandb', action='store_true', help='Enable W&B logging.')
@@ -456,10 +555,14 @@ if __name__ == '__main__':
             with open(f'{args.data_dir}/config.yaml', 'w') as cfile:
                 cfile.write(OmegaConf.to_yaml(cfg))
 
+        trajs = [d for _, _, _, d in unpack_trajectories(args.trajectories, 
+                                                         [np.load(t, allow_pickle=True) for t in args.trajectories], 
+                                                         ['position'])]
+
         main_bopt_agent(env, cfg.bopt_agent, conf_hash, args.show_gui, 
                         args.wandb, args.run_prefix, 
                         args.data_dir, render_video=args.video, 
-                        deep_eval_length=args.deep_eval)
+                        deep_eval_length=args.deep_eval, trajectories=trajs)
 
     elif args.mode == 'eval-gmm':
         if cfg.bopt_agent.gmm.type not in GMM_TYPES:

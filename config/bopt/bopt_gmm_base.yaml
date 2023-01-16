@@ -12,11 +12,6 @@ acq_func: "EI"
 acq_optimizer: "auto"
 gripper_command: 0.0
 
-regularizer:
-  f: zero          # Function [zero, p_joint, p_mean, kl, jsd, dot]
-  b: 1             # Linear factor for scaling the output of f
-
-
 gmm:
   model: ???
   type:  ???

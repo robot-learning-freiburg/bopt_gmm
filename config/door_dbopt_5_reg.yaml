@@ -1,0 +1,14 @@
+defaults:
+  - door_dbopt
+  - regularization@bopt_agent.regularizer: base
+
+bopt_agent:
+  early_tell: 1
+  gmm:
+    model: "models/gmm/door_em_5p.npy"
+    type: position
+  base_accuracy: 1.0
+  regularizer:
+    f: p_joint
+    b: 30
+    min_val: 22

@@ -1,0 +1,3 @@
+f: zero  # Function [zero, p_joint, p_mean, kl, jsd, dot]
+b: 1     # Linear factor for scaling the output of f
+min_val: 0
