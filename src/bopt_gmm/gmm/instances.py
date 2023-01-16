@@ -83,3 +83,12 @@ class GMMCart3DTorque(GMMCart3DForce):
         if type(obs_dict) == dict:
             obs_dict = np.hstack((obs_dict['position'], obs_dict['torque']))
         return GMM.predict(self, obs_dict, dims)[:,:3]
+
+
+GMM_TYPES = {'position': GMMCart3D,
+                'force': GMMCart3DForce,
+               'torque': GMMCart3DTorque}
+
+
+def load_gmm(gmm_config):
+    return GMM_TYPES[gmm_config.type].load_model(gmm_config.model)

@@ -19,9 +19,11 @@ from bopt_gmm.bopt import BOPTGMMCollectAndOptAgent, \
                           BOPTAgentGMMConfig,        \
                           BOPTAgentGenGMMConfig,     \
                           BOPT_TIME_SCALE
-from bopt_gmm.gmm import GMMCart3D, \
-                         GMMCart3DForce, \
-                         GMMCart3DTorque
+from bopt_gmm.gmm import GMMCart3D,       \
+                         GMMCart3DForce,  \
+                         GMMCart3DTorque, \
+                         GMM_TYPES,       \
+                         load_gmm
 
 from bopt_gmm.gmm.generation import seds_gmm_generator, \
                                     em_gmm_generator
@@ -36,8 +38,9 @@ from bopt_gmm.logging import WBLogger, \
                              MP4VideoLogger, \
                              CSVLogger
 
-from bopt_gmm.envs import PegEnv, \
-                          DoorEnv
+from bopt_gmm.envs import PegEnv,   \
+                          DoorEnv,  \
+                          ENV_TYPES
 
 
 class AgentWrapper(object):
