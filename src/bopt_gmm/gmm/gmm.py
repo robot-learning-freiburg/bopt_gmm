@@ -11,6 +11,14 @@ from typing      import Union
 
 from .utils import isPD, nearestPD
 
+
+GMM_MODEL_REGISTRY = {}
+
+def add_gmm_model(cls, name=None):
+    name = str(cls) if name is None else name
+    GMM_MODEL_REGISTRY[name] = cls
+
+
 class GMM(object):
     def __init__(self, priors: Union[int, np.array]=None, means: Union[int, np.array]=None, cvar: np.array=None):
         # 1D - Simply the priors
@@ -20,6 +28,8 @@ class GMM(object):
         elif priors.shape != (n_components, ):
             raise Exception(f'Expected priors to be of shape ({n_components},) '
                             f'but they are of shape {priors.shape}')
+        elif np.sum(priors) <= 5 * sys.float_info.epsilon:
+            raise ValueError(f'Value of priors is too low to normalize: {priors}')
         else:
             self._priors = priors / np.sum(priors)
         # 2D - Dimensionality * Number of components
@@ -40,6 +50,8 @@ class GMM(object):
                             f'but they are of shape {cvar.shape}')
         else:
             self._cvar = cvar
+        
+        self._GMM_TYPE = str(type(self))
 
     @property
     def n_priors(self):
@@ -211,11 +223,14 @@ class GMM(object):
             new_mu = self._means
 
         if sigma is not None:
-            tril_idx = self._cvar_tril_idx
+            if sigma.shape == self._cvar.shape:
+                sigma_mat = sigma
+            else:  # 1-D lower triangle update            
+                tril_idx = self._cvar_tril_idx
 
-            sigma_mat = np.zeros(self._cvar.shape)
-            sigma_mat[tril_idx]   = sigma
-            np.transpose(sigma_mat, [0, 2, 1])[tril_idx] = sigma
+                sigma_mat = np.zeros(self._cvar.shape)
+                sigma_mat[tril_idx]   = sigma
+                np.transpose(sigma_mat, [0, 2, 1])[tril_idx] = sigma
 
             new_sigma = self._cvar + sigma_mat
             for x in range(new_sigma.shape[0]):
@@ -235,16 +250,28 @@ class GMM(object):
             mu     = model["mu"]
             sigma  = model["sigma"]
             
+            if 'type' in model:
+                typ = GMM_MODEL_REGISTRY[model["type"]]
+            else:  # Maintain compatibility to old models
+                typ = cls
+            custom_data = model["custom_data"]
+            
             # Compatibility with older models
             mu     = mu.T    if len(priors) == mu.shape[1]     else mu
             sigma  = sigma.T if len(priors) == sigma.shape[-1] else sigma
-            return cls(priors, mu, sigma)
+            return typ(priors, mu, sigma, **custom_data)
         raise Exception(f'Path "{path}" does not exist')
 
     def save_model(self, path):
         np.save(path, {'priors': self._priors,  # num_gaussians
                        'mu'    : self._means,  # observation_size * 2, num_gaussians
-                       'sigma' : self._cvar})
+                       'sigma' : self._cvar,
+                       'type'  : self._GMM_TYPE,
+                       'custom_data': self._custom_data()})
+
+    def _custom_data(self):
+        """Returns a dictionary of additional data needed to instantiate this type of GMM"""
+        return {}
 
     def expand_model(self, dims, sigma, cvar=0):
         new_mu        = np.hstack((self._means, np.zeros((self._means.shape[0], dims))))
@@ -327,3 +354,5 @@ class GMM(object):
             np.ndarray: Filtered means (n_priors, |dims|)
         """
         return self._means.copy() if dims is None else self._means.take(dims, axis=1)
+
+add_gmm_model(GMM)

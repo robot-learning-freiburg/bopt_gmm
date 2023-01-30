@@ -7,7 +7,7 @@ from bopt_gmm.gmm   import GMM
 from bopt_gmm.utils import unpack_transition_traj, \
                            calculate_trajectory_velocities
 
-def gmm_fit_em(n_components, points, gmm_type=GMM, max_iter=100, tol=0.01, n_init=1):
+def gmm_fit_em(n_components, points, gmm_type=GMM, max_iter=100, tol=0.01, n_init=1, model_kwargs={}):
     """EM-Algorithm for fitting a GMM to data
 
     Args:
@@ -46,7 +46,7 @@ def gmm_fit_em(n_components, points, gmm_type=GMM, max_iter=100, tol=0.01, n_ini
 
     # cov = nearestPD(bgmm.covariances_) if not isPD(bgmm.covariances_) else bgmm.covariances_
 
-    return gmm_type(bgmm.weights_, bgmm.means_, bgmm.covariances_)
+    return gmm_type(bgmm.weights_, bgmm.means_, bgmm.covariances_, **model_kwargs)
 
 
 def em_gmm_generator(gmm_type, n_priors, max_iter, tol, n_init, data_order=['position', 'force', 'torque']):

@@ -24,7 +24,7 @@ class SEDS_MATLAB(object):
     def __del__(self):
         self.eng.quit()
 
-    def fit_model(self, x0, xT, data, idcs, n_priors=3, objective='likelihood', dt=1/100, tol_cutting=0.1, max_iter=600, gmm_type=GMM):
+    def fit_model(self, x0, xT, data, idcs, n_priors=3, objective='likelihood', dt=1/100, tol_cutting=0.1, max_iter=600, gmm_type=GMM, model_kwargs={}):
         priors, mu, sigma = self.eng.gen_seds_model(self.seds_path, 
                                                     matlab.double(x0.T),
                                                     matlab.double(xT.T),
@@ -39,7 +39,7 @@ class SEDS_MATLAB(object):
         priors = np.asarray(priors).squeeze()
         mu = np.asarray(mu)
         sigma = np.asarray(sigma)
-        return gmm_type(priors, mu.T, sigma.T)
+        return gmm_type(priors, mu.T, sigma.T, **model_kwargs)
 
 def gen_seds_data_from_transitions(transition_trajectories, deltaT, use_force=False):
     data    = []

@@ -1,5 +1,7 @@
 import numpy as np
 import os
+import bopt_gmm.gmm as gmm
+
 
 from argparse import ArgumentParser
 
@@ -13,6 +15,10 @@ from bopt_gmm.gmm.generation import SEDS_MATLAB, \
 from bopt_gmm.utils import unpack_trajectories, \
                            calculate_trajectory_velocities, \
                            normalize_trajectories
+
+MODEL_MAP = {'position' : gmm.GMMCart3D,
+             '_'.join(sorted(['position', 'force']))  : gmm.GMMCart3DForce,
+             '_'.join(sorted(['position', 'torque'])) : gmm.GMMCart3DTorque}
 
 if __name__ == '__main__':
     parser = ArgumentParser(description='Generate GMMs from trajectory data')
@@ -51,6 +57,15 @@ if __name__ == '__main__':
 
     dt = 1 / args.action_freq
 
+    gmm_type = MODEL_MAP['_'.join(sorted(args.modalities))]
+    model_kwargs = {}
+    if group_norms is not None:
+        if gmm_type == gmm.GMMCart3DForce:
+            model_kwargs = {'force_scale': group_norms['force']}
+        elif gmm_type == gmm.GMMCart3DTorque:
+            model_kwargs = {'force_scale': group_norms['torque']}
+
+
     if args.generator == 'seds':
         x0, xT, data, o_idx = gen_seds_data_from_trajectories(trajs, dt)
 
@@ -66,10 +81,17 @@ if __name__ == '__main__':
         # # exit()
         seds = SEDS_MATLAB(os.environ['SEDS_PATH'])
 
-        gmm = seds.fit_model(x0, xT, data, o_idx, args.n_priors, args.objective, dt, args.tol_cutting, args.max_iter)
+        gmm = seds.fit_model(x0, xT, data, o_idx, args.n_priors, args.objective, dt, 
+                             args.tol_cutting, args.max_iter, 
+                             gmm_type=gmm_type, model_kwargs=model_kwargs)
     elif args.generator == 'em':
         data = np.vstack([calculate_trajectory_velocities(t, dt) for t in trajs])
-        gmm  = gmm_fit_em(args.n_priors, data, max_iter=args.max_iter, tol=args.tol_cutting, n_init=args.n_init)
+        gmm  = gmm_fit_em(args.n_priors, data, 
+                          max_iter=args.max_iter, 
+                          tol=args.tol_cutting, 
+                          n_init=args.n_init,
+                          gmm_type=gmm_type,
+                          model_kwargs=model_kwargs)
 
     gmm.save_model(args.out)
 
