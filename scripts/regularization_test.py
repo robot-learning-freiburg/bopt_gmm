@@ -25,14 +25,18 @@ if __name__ == '__main__':
 
     gmms = []
 
-    for p in glob.glob(pattern):
-        p = Path(p)
-        
-        if p.name == 'gmm_base.npy':
-            base_gmm = GMMCart3D.load_model(p)
-        else:
-            gmms.append((p, GMMCart3D.load_model(p)))
-        
+    if Path(args.path).is_dir():
+        for p in glob.glob(pattern):
+            p = Path(p)
+            
+            if p.name == 'gmm_base.npy':
+                base_gmm = GMMCart3D.load_model(p)
+            else:
+                gmms.append((p, GMMCart3D.load_model(p)))
+    else:
+        gmms = [GMMCart3DForce.load_model(p)]
+        base_gmm = gmms[0]
+
     f_regs = [reg.f_joint_prob, reg.f_mean_prob, reg.f_kl, reg.f_jsd, reg.f_dot]
 
     values = []

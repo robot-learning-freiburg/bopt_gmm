@@ -16,3 +16,4 @@ gmm:
   model: ???
   type:  ???
   force_norm: ???
+  var_adjustment: 0  # Value added to the variances of the GMM to avoid numerical issues

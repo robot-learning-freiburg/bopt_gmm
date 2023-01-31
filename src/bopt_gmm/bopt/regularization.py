@@ -10,9 +10,12 @@ def f_zero(model_new, model_base, points):
 
 def f_joint_prob(model_new, model_base, points):
     pos   = points[:, model_base.state_dim]
-    base_inf = model_base.predict(pos, model_base.state_dim)
-    new_inf  = model_new.predict(pos, model_base.state_dim)
-    cond_prob_base, cond_prob_new = model_base.conditional_pdf(pos, model_base.state_dim, base_inf, new_inf)
+    base_inf = model_base.predict(pos, model_base.state_dim, full=True)
+    new_inf  = model_new.predict(pos, model_base.state_dim, full=True)
+    try:
+        cond_prob_base, cond_prob_new = model_base.conditional_pdf(pos, model_base.state_dim, base_inf, new_inf)
+    except ValueError as e:
+        return 0
 
     # joint_prob = np.log(cond_prob_new) / np.log(cond_prob_base)
     # conditional  = np.nan_to_num(joint_prob / pos_prob)
@@ -22,9 +25,12 @@ def f_joint_prob(model_new, model_base, points):
 
 def f_mean_prob(model_new, model_base, points):
     pos   = points[:, model_base.state_dim]
-    base_inf = model_base.predict(pos, model_base.state_dim)
-    new_inf  = model_new.predict(pos, model_base.state_dim)
-    cond_prob_base, cond_prob_new = model_base.conditional_pdf(pos, model_base.state_dim, base_inf, new_inf)
+    base_inf = model_base.predict(pos, model_base.state_dim, full=True)
+    new_inf  = model_new.predict(pos, model_base.state_dim, full=True)
+    try:
+        cond_prob_base, cond_prob_new = model_base.conditional_pdf(pos, model_base.state_dim, base_inf, new_inf)
+    except ValueError as e:
+        return 0
 
     return cond_prob_new.mean() / cond_prob_base.mean()
 
@@ -44,10 +50,10 @@ def f_jsd(model_new, model_base, points):
 
 def f_dot(model_new, model_base, points):
     i = tuple(range(points.shape[1]))
-    inv_mb = model_base.predict(points, i)
+    inv_mb = model_base.predict(points, i, full=True)
     b_norm = np.sqrt((inv_mb ** 2).sum(axis=1))
     inv_mb = (inv_mb.T / b_norm).T
-    inv_mn = (model_new.predict(points, i).T / b_norm).T
+    inv_mn = (model_new.predict(points, i, full=True).T / b_norm).T
 
     return np.nan_to_num((inv_mb * inv_mn).sum(axis=1), nan=1.0).mean()
 

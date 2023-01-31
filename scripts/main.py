@@ -22,7 +22,8 @@ from bopt_gmm.bopt import BOPTGMMCollectAndOptAgent, \
                           BOPT_TIME_SCALE
 import bopt_gmm.bopt.regularization as reg
                           
-from bopt_gmm.gmm import GMMCart3D,       \
+from bopt_gmm.gmm import GMM,             \
+                         GMMCart3D,       \
                          GMMCart3DForce,  \
                          GMMCart3DTorque, \
                          GMM_TYPES,       \
@@ -55,10 +56,10 @@ class AgentWrapper(object):
         self._gripper_command = gripper_command
 
     def predict(self, obs):
-        if callable(self._force_norm):
-            obs = self._force_norm(obs)
-        elif 'force' in obs:
-            obs['force'] = obs['force'] * self._force_norm
+        # if callable(self._force_norm):
+        #     obs = self._force_norm(obs)
+        # elif 'force' in obs:
+        #     obs['force'] = obs['force'] * self._force_norm
         return {'motion': self._model.predict(obs).flatten(), 'gripper': self._gripper_command}
 
     def step(self, *args):
@@ -217,7 +218,7 @@ def evaluate_agent(env, agent, num_episodes=100, max_steps=600,
             ic_logger.log(ic)
 
     if verbose > 0:
-        print(f'Evaluation result:\n  Accuracy: {acc}\n  Mean returns: {np.mean(returns)}\n  Mean length: {np.mean(lengths)}')
+        print(f'Evaluation result:\n  Accuracy: {accuracy}\n  Mean returns: {np.mean(episode_returns)}\n  Mean length: {np.mean(episode_lengths)}')
 
     return accuracy, episode_returns, episode_lengths
 
@@ -327,6 +328,9 @@ def bopt_regularized_training(env, agent, reg_data, regularizer,
         logger.define_metric('bopt accuracy',   BOPT_TIME_SCALE)
         logger.define_metric('bopt reward',     BOPT_TIME_SCALE)
         logger.define_metric('bopt mean steps', BOPT_TIME_SCALE)
+        logger.define_metric('n episode',       BOPT_TIME_SCALE)
+        logger.define_metric('bopt reg value',  BOPT_TIME_SCALE)
+        logger.define_metric('bopt ep run',     BOPT_TIME_SCALE)
         if deep_eval_length > 0:
             logger.define_metric('bopt deep eval accuracy', BOPT_TIME_SCALE)
 
@@ -353,7 +357,7 @@ def bopt_regularized_training(env, agent, reg_data, regularizer,
         
         # Save initial model and models every n-opts
         if opt_model_dir is not None:
-            if agent.is_in_gp_stage() and bopt_step == 1:
+            if agent.is_in_gp_stage() and agent.get_bopt_step() == 1:
                 agent.base_model.save_model(f'{opt_model_dir}/gmm_base.npy')
             
             if n_ep % checkpoint_freq == 0:
@@ -378,9 +382,13 @@ def bopt_regularized_training(env, agent, reg_data, regularizer,
 
         for tries in range(1000):
             reg_val = regularizer(agent.model, agent.base_model, reg_data)
+            logger.log({'bopt reg value' : reg_val})
             if min_reg_value <= reg_val:
                 break
             
+            # Log reg value as reward when it is used to update the model
+            logger.log({'bopt reward' : reg_val,
+                        'bopt ep run' : 0})
             agent.step_optimizer(reg_val)
         else:
             raise Exception(f'Failed to generate a feasible update complying with regularization in {tries} attempts')
@@ -408,7 +416,9 @@ def bopt_regularized_training(env, agent, reg_data, regularizer,
             bopt_mean_steps, bopt_reward, bopt_accuracy = ep_acc.get_stats()
             logger.log({'bopt mean steps': bopt_mean_steps,
                         'bopt reward'    : bopt_reward, 
-                        'bopt accuracy'  : bopt_accuracy})
+                        'bopt accuracy'  : bopt_accuracy,
+                        'n episode'      : n_ep,
+                        'bopt ep run'    : 1})
 
     # Save final model
     if opt_model_dir is not None:
@@ -439,6 +449,8 @@ def main_bopt_agent(env, bopt_agent_config, conf_hash,
     logger.log_config(bopt_agent_config)
 
     base_gmm = load_gmm(bopt_agent_config.gmm)
+    if 'var_adjustment' in bopt_agent_config.gmm and bopt_agent_config.gmm.var_adjustment != 0:
+        base_gmm = base_gmm.update_gaussian(sigma=np.stack([np.eye(base_gmm.n_dims) * bopt_agent_config.gmm.var_adjustment]*base_gmm.n_priors, axis=0))
 
     if bopt_agent_config.agent == 'bopt-gmm':
         if bopt_agent_config.gmm_generator.type == 'seds':
@@ -495,12 +507,13 @@ def main_bopt_agent(env, bopt_agent_config, conf_hash,
                                     base_accuracy=bopt_agent_config.base_accuracy)
 
         if bopt_agent_config.gmm.type in {'force', 'torque'}:
+            # Not used anymore as observation processing is now done by the GMM
             def obs_transform_force_norm(obs):
                 if 'force' in obs:
                     obs['force'] = obs['force'] * bopt_agent_config.gmm.force_norm
                 return obs
 
-            agent = BOPTGMMAgent(base_gmm, config, obs_transform_force_norm, logger=logger)
+            agent = BOPTGMMAgent(base_gmm, config, logger=logger)
         else:
             agent = BOPTGMMAgent(base_gmm, config, logger=logger)
 
@@ -557,7 +570,7 @@ if __name__ == '__main__':
 
         trajs = [d for _, _, _, d in unpack_trajectories(args.trajectories, 
                                                          [np.load(t, allow_pickle=True) for t in args.trajectories], 
-                                                         ['position'])]
+                                                         ['position', 'force'])]
 
         main_bopt_agent(env, cfg.bopt_agent, conf_hash, args.show_gui, 
                         args.wandb, args.run_prefix, 
@@ -569,9 +582,9 @@ if __name__ == '__main__':
             print(f'Unknown GMM type {cfg.bopt_agent.gmm.type}. Options are: {GMM_TYPES.keys()}')
             exit()
 
-        gmm = GMM_TYPES[cfg.bopt_agent.gmm.type].load_model(cfg.bopt_agent.gmm.model)
-        
         gmm_path = Path(cfg.bopt_agent.gmm.model)
+        gmm = GMM.load_model(cfg.bopt_agent.gmm.model)
+        
 
         if args.wandb:
             logger = WBLogger('bopt-gmm', f'eval_{cfg.bopt_agent.gmm.model[:-4]}', False)
@@ -586,7 +599,7 @@ if __name__ == '__main__':
             video_dir = None
 
         agent = AgentWrapper(gmm, 
-                             cfg.bopt_agent.gmm.force_norm, 
+                             1, 
                              cfg.bopt_agent.gripper_command)
 
         acc, returns, lengths = evaluate_agent(env, agent,

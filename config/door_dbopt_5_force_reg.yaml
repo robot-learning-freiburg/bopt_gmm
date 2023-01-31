@@ -1,0 +1,13 @@
+defaults:
+  - door_dbopt_force_5
+  - regularization@bopt_agent.regularizer: base
+
+bopt_agent:
+  early_tell: 1
+  base_accuracy: 1.0
+  regularizer:
+    f: p_joint
+    b: 30
+    min_val: 22
+  gmm:
+    var_adjustment: 1e-3
