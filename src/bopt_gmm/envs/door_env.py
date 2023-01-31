@@ -30,7 +30,7 @@ from .utils     import BoxSampler, \
 
 class DoorEnv(Env):
     def __init__(self, cfg, show_gui=False):
-        self.sim = BasicSimulator(cfg.action_frequency, use_egl=True)
+        self.sim = BasicSimulator(cfg.action_frequency, use_egl=not show_gui)
         self.sim.init('gui' if show_gui else 'direct')
 
         self.dt        = 1 / cfg.action_frequency
