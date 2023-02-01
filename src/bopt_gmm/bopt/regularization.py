@@ -38,20 +38,20 @@ def f_mean_prob(model_new, model_base, points):
 def f_kl(model_new, model_base, points):
     p_mb = model_base.pdf(points, tuple(range(points.shape[1])))
     p_mn = model_new.pdf(points, tuple(range(points.shape[1])))
-    return np.sum(np.where(p_mb != 0, p_mb * np.log(p_mb / p_mn), 0))
+    return np.exp(-np.sum(np.where(p_mb != 0, p_mb * np.log(p_mb / p_mn), 0)) * 1e-12)
 
 
 def f_jsd(model_new, model_base, points):
     p_mb = model_base.pdf(points, tuple(range(points.shape[1])))
     p_mn = model_new.pdf(points, tuple(range(points.shape[1])))
-    return 0.5 * (np.sum(np.where(p_mb != 0, p_mb * np.log(p_mb / p_mn), 0)) + 
-                  np.sum(np.where(p_mn != 0, p_mn * np.log(p_mn / p_mb), 0)))
+    return np.exp(-0.5 * (np.sum(np.where(p_mb != 0, p_mb * np.log(p_mb / p_mn), 0)) + 
+                   np.sum(np.where(p_mn != 0, p_mn * np.log(p_mn / p_mb), 0))) * 1e-12)
 
 
 def f_dot(model_new, model_base, points):
     i = tuple(range(points.shape[1]))
     inv_mb = model_base.predict(points, i, full=True)
-    b_norm = np.sqrt((inv_mb ** 2).sum(axis=1))
+    b_norm = np.sqrt((inv_mb ** 2).sum(axis=1)) + sys.float_info.epsilon
     inv_mb = (inv_mb.T / b_norm).T
     inv_mn = (model_new.predict(points, i, full=True).T / b_norm).T
 

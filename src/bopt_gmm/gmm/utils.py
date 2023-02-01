@@ -61,7 +61,7 @@ def rollout(gmm, start, steps=100, dt=1/30, stack_vels=False):
     print(f'Position Dim: {position_dim} {gmm.n_dims}')
 
     for _ in range(steps):
-        vel   = gmm.predict(point, position_dim)
+        vel   = gmm.predict(point, position_dim, full=True)
         point = point + dt * vel
         vels.append(vel)
         traj.append(point)

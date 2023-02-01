@@ -8,7 +8,7 @@ from pathlib  import Path
 import bopt_gmm.bopt.regularization as reg
 
 from bopt_gmm.utils import unpack_trajectories
-from bopt_gmm.gmm   import GMMCart3DForce, rollout, GMMCart3D
+from bopt_gmm.gmm   import GMM, GMMCart3DForce, rollout, GMMCart3D
 
 if __name__ == '__main__':
     parser = ArgumentParser(description='Calculates the regularization values for a models and trajectories in a folder.')
@@ -21,7 +21,7 @@ if __name__ == '__main__':
     positions = [pos for _, _, _, pos in unpack_trajectories(args.trajectories, 
                                                              [np.load(t, allow_pickle=True) for t in args.trajectories], 
                                                              ['position', 'force'])]
-    # positions = np.vstack(positions)
+    positions = np.vstack(positions)
 
     gmms = []
 
@@ -30,11 +30,11 @@ if __name__ == '__main__':
             p = Path(p)
             
             if p.name == 'gmm_base.npy':
-                base_gmm = GMMCart3D.load_model(p)
+                base_gmm = GMM.load_model(p)
             else:
-                gmms.append((p, GMMCart3D.load_model(p)))
+                gmms.append((p, GMM.load_model(p)))
     else:
-        gmms = [GMMCart3DForce.load_model(p)]
+        gmms = [GMM.load_model(p)]
         base_gmm = gmms[0]
 
     f_regs = [reg.f_joint_prob, reg.f_mean_prob, reg.f_kl, reg.f_jsd, reg.f_dot]
@@ -43,7 +43,7 @@ if __name__ == '__main__':
 
     gmms.insert(0, (Path('gmm_base.npy'), base_gmm))
 
-    positions = np.vstack([rollout(gmms[0][1], p[0][:len(gmms[0][1].state_dim)], True) for p in positions])
+    # positions = np.vstack([rollout(gmms[0][1], p[0][:len(gmms[0][1].state_dim)], True) for p in positions])
 
     for gmm_path, gmm in gmms:
         values.append([f(gmm, base_gmm, positions) for f in f_regs])
