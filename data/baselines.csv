@@ -1,0 +1,16 @@
+model,scenario,noise,accuracy
+models/gmm/door_3p.npy,door,0,0.52
+models/gmm/door_3p.npy,door,0.01,0.52
+models/gmm/door_3p.npy,door,0.02,0.22
+models/gmm/door_3p.npy,door,0.03,0.17
+models/gmm/door_3p.npy,door,0.05,0.06
+models/gmm/door_5p.npy,door,0,0.75
+models/gmm/door_5p.npy,door,0.01,0.55
+models/gmm/door_5p.npy,door,0.02,0.31
+models/gmm/door_5p.npy,door,0.03,0.24
+models/gmm/door_5p.npy,door,0.05,0.11
+models/gmm/door_7p.npy,door,0,0.68
+models/gmm/door_7p.npy,door,0.01,0.52
+models/gmm/door_7p.npy,door,0.02,0.46
+models/gmm/door_7p.npy,door,0.03,0.32
+models/gmm/door_7p.npy,door,0.05,0.09
