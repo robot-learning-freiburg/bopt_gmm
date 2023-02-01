@@ -29,6 +29,10 @@ from bopt_gmm.gmm import GMM,             \
                          GMM_TYPES,       \
                          load_gmm
 
+from bopt_gmm import bopt, \
+                     common, \
+                     gmm
+
 from bopt_gmm.gmm.generation import seds_gmm_generator, \
                                     em_gmm_generator
 
@@ -46,99 +50,6 @@ from bopt_gmm.logging import WBLogger, \
 from bopt_gmm.envs import PegEnv,   \
                           DoorEnv,  \
                           ENV_TYPES
-
-
-class AgentWrapper(object):
-    def __init__(self, model, force_norm=1.0, gripper_command=0.0) -> None:
-        self._model = model
-        self.pseudo_bopt_step = 0
-        self._force_norm = force_norm
-        self._gripper_command = gripper_command
-
-    def predict(self, obs):
-        # if callable(self._force_norm):
-        #     obs = self._force_norm(obs)
-        # elif 'force' in obs:
-        #     obs['force'] = obs['force'] * self._force_norm
-        return {'motion': self._model.predict(obs).flatten(), 'gripper': self._gripper_command}
-
-    def step(self, *args):
-        pass
-    
-    def has_gp_stage(self):
-        return False
-
-    def is_in_gp_stage(self):
-        return False
-
-    def get_bopt_step(self):
-        self.pseudo_bopt_step += 1
-        return self.pseudo_bopt_step
-
-
-@dataclass
-class RunAccumulator:
-    _steps     : int   = 0
-    _reward    : float = 0.0
-    _successes : int   = 0
-    _runs      : int   = 0
-
-    def log_run(self, steps, reward, success):
-        self._runs      += 1
-        self._steps    += steps
-        self._reward    += reward
-        self._successes += int(success)
-
-    def get_stats(self):
-        if self._runs == 0:
-            return 0.0, 0
-        return self._steps / self._runs, self._reward, self._successes / self._runs
-
-
-def run_episode(env, agent, max_steps, post_step_hook=None):
-    observation    = env.reset()
-    episode_return = 0.0
-
-    initial_conditions = env.config_dict()
-
-    for step in range(max_steps):
-        action = agent.predict(observation)
-        # print(observation)
-        post_observation, reward, done, info = env.step(action)
-        episode_return += reward
-        done = done or (step == max_steps - 1)
-
-        if post_step_hook is not None:
-            post_step_hook(step, env, agent, observation, post_observation, action, reward, done, info)
-
-        observation = post_observation
-        
-        if done:
-            break
-    
-    info['initial_conditions'] = initial_conditions
-
-    return episode_return, step, info
-
-
-def post_step_hook_dispatcher(*hooks):
-    def dispatcher(step, env, agent, obs, post_obs, action, reward, done, info):
-        for h in hooks:
-            h(step, env, agent, obs, post_obs, action, reward, done, info)
-    return dispatcher
-
-
-def post_step_hook_bopt(_, env, agent, obs, post_obs, action, reward, done, info):
-    agent.step(obs, post_obs, action, reward, done)
-
-
-def gen_video_logger_and_hook(dir_path, filename, image_size, frame_rate=30.0):
-    logger = MP4VideoLogger(dir_path, filename, image_size)
-
-    def video_hook(_, env, *args):
-        logger.write_image(env.render()[:,:,::-1])
-    
-    return logger, video_hook
 
 
 def gen_force_logger_and_hook():
@@ -183,10 +94,10 @@ def evaluate_agent(env, agent, num_episodes=100, max_steps=600,
         post_step_hooks = [] if live_plot_hook is None else [live_plot_hook]
 
         if video_dir is not None:
-            video_logger, video_hook = gen_video_logger_and_hook(video_dir, f'eval_{ep:04d}', env.render_size[:2])
+            video_logger, video_hook = common.gen_video_logger_and_hook(video_dir, f'eval_{ep:04d}', env.render_size[:2])
             post_step_hooks.append(video_hook)
 
-        ep_return, step, info = run_episode(env, agent, max_steps, post_step_hook=post_step_hook_dispatcher(*post_step_hooks))
+        ep_return, step, info = common.run_episode(env, agent, max_steps, post_step_hook=common.post_step_hook_dispatcher(*post_step_hooks))
         
         episode_returns.append(ep_return)
         episode_lengths.append(step)        
@@ -248,7 +159,7 @@ def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10,
         live_plot_hook = None
 
     for bopt_step in tqdm(range(num_episodes), desc="Training BOPT model"):
-        ep_acc = RunAccumulator()
+        ep_acc = common.RunAccumulator()
         
         # Save initial model and models every n-opts
         if opt_model_dir is not None:
@@ -267,9 +178,9 @@ def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10,
             # Fix location generation
             eval_ic_path = f'{opt_model_dir}/../eval_{bopt_step}_ic.csv' if opt_model_dir is not None else None
 
-            eval_agent = AgentWrapper(agent.model, 
-                                      agent.state.obs_transform, 
-                                      agent.config.gripper_command)
+            eval_agent = common.AgentWrapper(agent.model, 
+                                             agent.state.obs_transform, 
+                                             agent.config.gripper_command)
 
             e_acc, _, _ = evaluate_agent(env, eval_agent,
                                          num_episodes=deep_eval_length,
@@ -281,18 +192,18 @@ def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10,
             logger.log({'bopt deep eval accuracy': e_acc})
 
         # Setup post-step hooks  
-        post_step_hooks = [post_step_hook_bopt]
+        post_step_hooks = [common.post_step_hook_bopt]
         if live_plot_hook is not None:
             post_step_hooks.append(live_plot_hook)
 
         if video_dir is not None:
-            video_logger, video_hook = gen_video_logger_and_hook(video_dir, f'bopt_{bopt_step:04d}', env.render_size[:2])
+            video_logger, video_hook = common.gen_video_logger_and_hook(video_dir, f'bopt_{bopt_step:04d}', env.render_size[:2])
             post_step_hooks.append(video_hook)
 
         # Collecting data for next BOPT update
         sub_ep_idx = 0
         while agent.get_bopt_step() == bopt_step:
-            ep_return, step, info = run_episode(env, agent, max_steps, post_step_hook=post_step_hook_dispatcher(*post_step_hooks))
+            ep_return, step, info = common.run_episode(env, agent, max_steps, post_step_hook=common.post_step_hook_dispatcher(*post_step_hooks))
             ep_acc.log_run(step + 1, ep_return, info['success'])
             if ic_logger is not None:
                 ic = info['initial_conditions']
@@ -350,10 +261,10 @@ def bopt_regularized_training(env, agent, reg_data, regularizer,
 
     def post_step_hook_bopt_reg(_, env, agent, obs, post_obs, action, reward, done, info):
         reg_val = regularizer(agent.model, agent.base_model, reg_data) if done else 0
-        post_step_hook_bopt(_, env, agent, obs, post_obs, action, reward + reg_val, done, info)
+        common.post_step_hook_bopt(_, env, agent, obs, post_obs, action, reward + reg_val, done, info)
 
     for n_ep in tqdm(range(num_episodes), desc="Training regularized BOPT model"):
-        ep_acc = RunAccumulator()
+        ep_acc = common.RunAccumulator()
         
         # Save initial model and models every n-opts
         if opt_model_dir is not None:
@@ -368,7 +279,7 @@ def bopt_regularized_training(env, agent, reg_data, regularizer,
             # Fix location generation
             eval_ic_path = f'{opt_model_dir}/../eval_{n_ep}_ic.csv' if opt_model_dir is not None else None
 
-            eval_agent = AgentWrapper(agent.model, 
+            eval_agent = common.AgentWrapper(agent.model, 
                                       agent.state.obs_transform, 
                                       agent.config.gripper_command)
 
@@ -397,7 +308,7 @@ def bopt_regularized_training(env, agent, reg_data, regularizer,
         post_step_hooks = [post_step_hook_bopt_reg]
 
         # Collecting data for next BOPT update
-        ep_return, step, info = run_episode(env, agent, max_steps, post_step_hook=post_step_hook_dispatcher(*post_step_hooks))
+        ep_return, step, info = common.run_episode(env, agent, max_steps, post_step_hook=common.post_step_hook_dispatcher(*post_step_hooks))
         ep_acc.log_run(step + 1, ep_return, info['success'])
         if ic_logger is not None:
             ic = info['initial_conditions']
@@ -442,13 +353,14 @@ def main_bopt_agent(env, bopt_agent_config, conf_hash,
     if video_dir is not None and not Path(video_dir).exists():
         Path(video_dir).mkdir(parents=True)
 
+    base_gmm = load_gmm(bopt_agent_config.gmm)
+
     run_id = f'{bopt_agent_config.agent}_{conf_hash}'
-    run_id = f'{log_prefix}_{run_id}' if log_prefix is not None else run_id
+    run_id = f'{log_prefix}_{run_id}_p{base_gmm.n_priors}_d{base_gmm.n_dims // 2}' if log_prefix is not None else run_id
 
     logger = WBLogger('bopt-gmm', run_id, True) if wandb else BlankLogger()
     logger.log_config(bopt_agent_config)
 
-    base_gmm = load_gmm(bopt_agent_config.gmm)
     if 'var_adjustment' in bopt_agent_config.gmm and bopt_agent_config.gmm.var_adjustment != 0:
         base_gmm = base_gmm.update_gaussian(sigma=np.stack([np.eye(base_gmm.n_dims) * bopt_agent_config.gmm.var_adjustment]*base_gmm.n_priors, axis=0))
 
@@ -587,9 +499,13 @@ if __name__ == '__main__':
         
 
         if args.wandb:
+            run_name = f'eval_{cfg.bopt_agent.gmm.model[:-4]}'
+            if args.run_prefix is not None:
+                run_name = args.run_prefix
             logger = WBLogger('bopt-gmm', f'eval_{cfg.bopt_agent.gmm.model[:-4]}', False)
             logger.log_config({'type': cfg.bopt_agent.gmm.type, 
-                               'model': cfg.bopt_agent.gmm.model})
+                               'model': cfg.bopt_agent.gmm.model,
+                               'env': cfg.env})
         else: 
             logger = None
 
@@ -598,9 +514,7 @@ if __name__ == '__main__':
         else:
             video_dir = None
 
-        agent = AgentWrapper(gmm, 
-                             1, 
-                             cfg.bopt_agent.gripper_command)
+        agent = common.AgentWrapper(gmm, cfg.bopt_agent.gripper_command)
 
         acc, returns, lengths = evaluate_agent(env, agent,
                                                num_episodes=100,
