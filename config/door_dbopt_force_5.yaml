@@ -5,5 +5,4 @@ bopt_agent:
   gmm:
     model: "models/gmm/door_5p_f_new.npy"
     type: force
-    force_norm: 2.6178633634847966e-05
   base_accuracy: 0.21
