@@ -170,7 +170,7 @@ def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10,
                 agent.model.save_model(f'{opt_model_dir}/gmm_{bopt_step}.npy')
         
         # 
-        if bopt_step > 0 and bopt_step % checkpoint_freq == 0 and deep_eval_length > 0:
+        if bopt_step % checkpoint_freq == 0 and deep_eval_length > 0:
             eval_video_dir = f'{video_dir}/eval_{bopt_step}' if video_dir is not None else None
             if eval_video_dir is not None and not Path(eval_video_dir).exists():
                 Path(eval_video_dir).mkdir(parents=True)
@@ -178,8 +178,7 @@ def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10,
             # Fix location generation
             eval_ic_path = f'{opt_model_dir}/../eval_{bopt_step}_ic.csv' if opt_model_dir is not None else None
 
-            eval_agent = common.AgentWrapper(agent.model, 
-                                             agent.state.obs_transform, 
+            eval_agent = common.AgentWrapper(agent.model,
                                              agent.config.gripper_command)
 
             e_acc, _, _ = evaluate_agent(env, eval_agent,
@@ -356,7 +355,7 @@ def main_bopt_agent(env, bopt_agent_config, conf_hash,
     base_gmm = load_gmm(bopt_agent_config.gmm)
 
     run_id = f'{bopt_agent_config.agent}_{conf_hash}'
-    run_id = f'{log_prefix}_{run_id}_p{base_gmm.n_priors}_d{base_gmm.n_dims // 2}' if log_prefix is not None else run_id
+    run_id = f'{log_prefix}_{run_id}' if log_prefix is not None else run_id
 
     logger = WBLogger('bopt-gmm', run_id, True) if wandb else BlankLogger()
     logger.log_config(bopt_agent_config)

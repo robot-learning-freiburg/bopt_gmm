@@ -1,11 +1,15 @@
 import hashlib 
-import operator
-import struct
-import omegaconf as oc
 import numpy     as np
+import omegaconf as oc
+import operator
+import os
+import signal
+import sys
+import time
 
-from functools import reduce
-from pathlib import Path
+from functools  import reduce
+from pathlib    import Path
+from subprocess import Popen
 
 
 def gen_trajectory_from_transitions(transition_trajectories, deltaT):
@@ -217,6 +221,47 @@ def parse_list(list_str, tf=str):
         raise Exception(f'Expected list string to start with "[" and end with "]"')
 
     return [tf(i) for i in list_str[1:-1].split(',')]
+
+
+class JobRunner():
+    def __init__(self, jobs, n_processes=100) -> None:
+        self.jobs      = jobs
+        self.processes = []
+        self.n_proc    = n_processes
+
+    def _sig_handler(self, sig, *args):
+        print('Received SIGINT. Killing subprocesses...')
+        for p in self.processes:
+            p.send_signal(signal.SIGINT)
+        
+        for p in self.processes:
+            p.wait()
+        sys.exit(0)
+
+    def run(self):
+        signal.signal(signal.SIGINT, self._sig_handler)
+
+        tasks = self.jobs.copy()
+
+        with open(os.devnull, 'w') as devnull:
+            while len(tasks) > 0:
+                while len(self.processes) < self.n_proc and len(tasks) > 0:
+                    self.processes.append(Popen(tasks[0], stdout=devnull))
+                    print(f'Launched task "{" ".join(tasks[0])}"\nRemaining {len(tasks) - 1}')
+                    tasks = tasks[1:]
+
+                time.sleep(1.0)
+
+                tidx = 0
+                while tidx < len(self.processes):
+                    if self.processes[tidx].poll() is not None:
+                        del self.processes[tidx]
+                    else:
+                        tidx += 1
+
+            print('Waiting for their completion...')
+            for p in self.processes:
+                p.wait()
 
 
 if __name__ == '__main__':

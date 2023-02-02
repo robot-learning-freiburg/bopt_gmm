@@ -6,7 +6,9 @@ import signal
 from subprocess import Popen
 
 from bopt_gmm.utils import power_set, \
-                           parse_list
+                           parse_list, \
+                           JobRunner
+
 
 if __name__ == '__main__':
     args = sys.argv[1:]
@@ -42,36 +44,6 @@ if __name__ == '__main__':
 
     tasks = [(['python'] + p_args + ['--overrides'] + [f'{k}={a}' for k, a in zip(arg_names, aset)] + fixed_args) for aset in arg_sets]
     
-    processes = []
-
-    def sig_handler(sig, *args):
-        print('Received SIGINT. Killing subprocesses...')
-        for p in processes:
-            p.send_signal(signal.SIGINT)
-        
-        for p in processes:
-            p.wait()
-        sys.exit(0)
-
-    signal.signal(signal.SIGINT, sig_handler)
-
-    with open(os.devnull, 'w') as devnull:
-        while len(tasks) > 0:
-            while len(processes) < nproc and len(tasks) > 0:
-                processes.append(Popen(tasks[0], stdout=devnull))
-                print(f'Launched task "{" ".join(tasks[0])}"\nRemaining {len(tasks) - 1}')
-                tasks = tasks[1:]
-
-            time.sleep(1.0)
-
-            tidx = 0
-            while tidx < len(processes):
-                if processes[tidx].poll() is not None:
-                    del processes[tidx]
-                else:
-                    tidx += 1
-
-        print('Waiting for their completion...')
-        for p in processes:
-            p.wait()
+    runner = JobRunner(tasks, nproc)
+    runner.run()
     print('Done')
