@@ -10,4 +10,4 @@ bopt_agent:
     b: 30
     min_val: 22
   gmm:
-    var_adjustment: 1e-3
+    var_adjustment: 0
