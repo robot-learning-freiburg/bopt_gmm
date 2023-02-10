@@ -338,7 +338,8 @@ def bopt_regularized_training(env, agent, reg_data, regularizer,
 
 def main_bopt_agent(env, bopt_agent_config, conf_hash, 
                     show_force=True, wandb=False, log_prefix=None, 
-                    data_dir=None, render_video=False, deep_eval_length=0, trajectories=None):
+                    data_dir=None, render_video=False, deep_eval_length=0,
+                    trajectories=None, ckpt_freq=10):
 
     if bopt_agent_config.agent not in {'bopt-gmm', 'dbopt'}:
         raise Exception(f'Unkown agent type "{bopt_agent_config.agent}"')
@@ -431,7 +432,8 @@ def main_bopt_agent(env, bopt_agent_config, conf_hash,
     if 'regularizer' not in bopt_agent_config:
         bopt_training(env, agent, num_episodes=100, max_steps=600, 
                       opt_model_dir=model_dir, logger=logger, 
-                      video_dir=video_dir, show_force=show_force, 
+                      video_dir=video_dir, show_force=show_force,
+                      checkpoint_freq=ckpt_freq,
                       deep_eval_length=deep_eval_length)
     else:
         regularizer = reg.gen_regularizer(bopt_agent_config.regularizer)
@@ -459,6 +461,7 @@ if __name__ == '__main__':
     parser.add_argument('--show-gui', action='store_true', help='Show interactive GUI')
     parser.add_argument('--deep-eval', default=0, type=int, help='Number of deep evaluation episodes to perform during bopt training.')
     parser.add_argument('--data-dir', default=None, help='Directory to save models and data to. Will be created if non-existent')
+    parser.add_argument('--ckpt-freq', default=10, type=int, help='Frequency at which to save and evaluate models')
     args = parser.parse_args()
 
     # Point hydra to the root of your config dir. Here it's hard-coded, but you can also
@@ -486,7 +489,8 @@ if __name__ == '__main__':
         main_bopt_agent(env, cfg.bopt_agent, conf_hash, args.show_gui, 
                         args.wandb, args.run_prefix, 
                         args.data_dir, render_video=args.video, 
-                        deep_eval_length=args.deep_eval, trajectories=trajs)
+                        deep_eval_length=args.deep_eval, trajectories=trajs,
+                        ckpt_freq=args.ckpt_freq)
 
     elif args.mode == 'eval-gmm':
         if cfg.bopt_agent.gmm.type not in GMM_TYPES:

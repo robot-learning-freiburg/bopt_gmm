@@ -10,3 +10,4 @@ scikit-optimize
 smac
 dearpygui
 tqdm
+pandas
