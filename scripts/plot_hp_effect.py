@@ -27,6 +27,8 @@ numerical_types = {float, int,
                    }
 
 if __name__ == '__main__':
+    hp_header = 'acq_func acq_opt init_gen p_range mu_range'.split(' ')
+
     parser = ArgumentParser(description='Generates scatter plots for a given summary file.')
     parser.add_argument('summary', help='Summary file')
     parser.add_argument('--out', default=None, help='Name of output image.')
@@ -36,7 +38,19 @@ if __name__ == '__main__':
     parser.add_argument('--su', default=1000000, type=int, help='Upper bound of evals to slice from.')
     parser.add_argument('--evolution', action='store_true', help='Create an animation instead of a single image of the evolution of the plot.')
     parser.add_argument('--ws', default=1000000, type=int, help='Window size of the evolving animation.')
+    parser.add_argument('--filters', nargs='+', default=[], help=f'Filter for individual value assignments as METRIC=VALUE. Metrics are: {", ".join(hp_header)}\n')
     args = parser.parse_args()
+
+    filters = []
+    for f, v in [f.split('=') for f in args.filters]:
+        try:
+            v = int(v)
+        except ValueError:
+            try:
+                v = float(v)
+            except ValueError:
+                pass
+        filters.append((f, v))
 
     if args.evolution:
         if args.out is None:
@@ -60,9 +74,7 @@ if __name__ == '__main__':
     except ValueError:
         metric_index = list(df.columns).index('demo_base') + 1
     
-
     hp_data   = []
-    hp_header = 'acq_func acq_opt init_gen p_range mu_range'.split(' ')
     
     for p in df.path:
         func, pr, mr, sampling, opt = regex.findall(pattern, p)[0]
@@ -77,6 +89,10 @@ if __name__ == '__main__':
 
     df_full = df.join(pd.DataFrame(hp_data, columns=hp_header))
 
+    for f, v in filters:
+        df_full = df_full[df_full[f] == v]
+
+
     args.su = min(args.su, len(df_full))
 
     if args.evolution:
@@ -84,7 +100,7 @@ if __name__ == '__main__':
     else:
         ranges = [(args.sl, args.su)]
 
-    n_plots = len(hp_header)
+    n_plots = len(hp_header) + 1
 
     cols = int(math.sqrt(n_plots))
     rows = int(math.ceil(n_plots / cols))
@@ -129,6 +145,9 @@ if __name__ == '__main__':
             ax.set_xticklabels(unique_values)
             # ax.scatter(data[0], data[1], marker='.')
             ax.set_ylim(-0.05, 1.05)
+        else:
+            ax = fig.add_subplot(gs[rows-1:rows, cols-1:cols])
+            ax.text(0.05, 0.05, '\n'.join([f'Interval: {rl} - {ru}', 'Filters:', ', '.join([f'{f}={v}' for f, v in filters])]))
 
         fig.tight_layout()
         if args.evolution:
