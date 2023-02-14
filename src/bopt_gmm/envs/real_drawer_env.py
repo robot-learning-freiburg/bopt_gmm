@@ -39,33 +39,38 @@ from geometry_msgs.msg import WrenchStamped as WrenchStampedMsg
 
 class RealDrawerEnv(Env):
     def __init__(self, cfg, show_gui=False):
+        rospy.init_node('bopt_gmm_real_drawer')
+
         # Only used for IK
         self._ik_model = rp.models.Panda()
 
-        self.workspace = AABB(Point3(0.3, -0.85, 0), 
-                              Point3(0.85, 0.85, 0.8))
+        self.workspace = AABB(Point3(-0.4, -0.4, 0), 
+                              Point3( 0.4,  0.4, 0.8))
 
         self.tfBuffer = tf2_ros.Buffer()
         self.listener = tf2_ros.TransformListener(self.tfBuffer)
 
         self._robot   = Panda(cfg.robot.state_prefix, 
-                              cfg.robot.controllers)
+                              cfg.robot.controllers_prefix)
 
         self._ref_frame    = cfg.reference_frame
         self._drawer_frame = cfg.drawer_frame
-        
-        self._ref_in_robot        = None
+        self._target_position = cfg.open_position
+
+        self._robot_T_ref         = None
+        self._ref_T_robot         = None
         self._current_drawer_pose = None
+        self._ref_P_drawer        = None
 
-        self._robot_frame = cfg.robot.ref_frame
-        self._ee_frame    = cfg.robot.ee_frame
+        self._robot_frame = cfg.robot.reference_frame
+        self._ee_frame    = cfg.robot.endeffector_frame
 
-        self._arm_reset_pose = cfg.robot.joint_reset_pose
+        self._arm_reset_pose = cfg.robot.initial_pose.q
 
         self._ee_rot = self._ik_model.fkine(self._arm_reset_pose).R
 
-        self.starting_position_sampler = BoxSampler(cfg.initial_pose.position.min,
-                                                    cfg.initial_pose.position.max)
+        self.starting_position_sampler = BoxSampler(cfg.robot.initial_pose.position.min,
+                                                    cfg.robot.initial_pose.position.max)
 
         # self._init_pose = Transform(Point3(*robot_init_state.position), initial_rot)
         # self.robot.set_joint_positions(cfg.robot.initial_pose.q, override_initial=True)
@@ -80,19 +85,29 @@ class RealDrawerEnv(Env):
 
         self._elapsed_steps = 0
         self._n_reset = 0
-        self._joint_reset_every = cfg.n_joint_reset
+        self._joint_reset_every = cfg.robot.joint_reset_frequency
+        self._goal_lookup_timer = rospy.Timer(rospy.Duration(0.1), self._goal_look_up)
+
+    def _goal_look_up(self, *args):
+        try:
+            tf_stamped = self.tfBuffer.lookup_transform(self._ref_frame, self._drawer_frame, rospy.Time(0))
+            
+            self._ref_P_drawer = Point3(tf_stamped.transform.translation.x, 
+                                        tf_stamped.transform.translation.y, 
+                                        tf_stamped.transform.translation.z)
+        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
+            pass
 
     @property
     def config_space(self):
         return sum([[f'{k}_noise_{x}' for x in 'xyz'] for k in self.noise_samplers.keys()], []) + \
-                    [f'door_pose_{x}' for x in 'x,y,z,qx,qy,qz,qw'.split(',')] + \
                     [f'ee_pose_{x}' for x in 'x,y,z,qx,qy,qz,qw'.split(',')]
 
     def config_dict(self):
+        raise NotImplementedError
         out = {} 
         for k, n in self.noise_samplers.items(): 
             out.update(dict(zip([f'{k}_noise_{x}' for x in 'xyz'], n.sample())))
-        out.update(dict(zip([f'door_pose_{x}' for x in 'x,y,z,qx,qy,qz,qw'.split(',')], self.door.pose.array())))
         out.update(dict(zip([f'ee_pose_{x}' for x in 'x,y,z,qx,qy,qz,qw'.split(',')], self.eef.pose.array())))
         return out
 
@@ -127,30 +142,43 @@ class RealDrawerEnv(Env):
 
     def reset(self):
         # Establish reference frame if it's not existing
-        if self._ref_in_robot is None:
+        while self._robot_T_ref is None:
             try:
                 tf_stamped = self.tfBuffer.lookup_transform(self._robot_frame, self._ref_frame, rospy.Time(0))
                 
-                self._ref_in_panda = Transform(Point3(tf_stamped.transform.translation.x, 
-                                                      tf_stamped.transform.translation.y, 
-                                                      tf_stamped.transform.translation.z),
-                                               Quaternion(tf_stamped.transform.rotation.x,
-                                                          tf_stamped.transform.rotation.y,
-                                                          tf_stamped.transform.rotation.z,
-                                                          tf_stamped.transform.rotation.w))
+                quat = sm.UnitQuaternion(tf_stamped.transform.rotation.w,
+                                         (tf_stamped.transform.rotation.x,
+                                          tf_stamped.transform.rotation.y,
+                                          tf_stamped.transform.rotation.z))
+
+                self._robot_T_ref = sm.SE3.Rt(quat.R, (tf_stamped.transform.translation.x, 
+                                                       tf_stamped.transform.translation.y, 
+                                                       tf_stamped.transform.translation.z))
+                self._ref_T_robot = self._robot_T_ref.inv()
             except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
-                pass
+                print(f'Trying to lookup reference frame {self._ref_frame} in {self._robot_frame}')
+
+        while self._ref_P_drawer is None or self._ref_P_drawer.z > 0.015:
+            print('Waiting for drawer to be registered or reset...')
+            rospy.sleep(0.3)
+
+        while not self._robot.is_operational:
+            print('Waiting for robot to become operational again...')
+            rospy.sleep(0.3)
 
         # Reset joint space position every couple of episodes
         if self._n_reset % self._joint_reset_every == 0:
-            self._robot.move_joints(self._arm_rest_pose)
+        #     self._robot.move_joints(self._arm_rest_pose)
+            print('FAKE MOVE ROBOT TO INITIAL Q')
+
 
         starting_position = Point3(*self.starting_position_sampler.sample())
         starting_pose     = sm.SE3.Rt(self._ee_rot, starting_position)
 
-        q_start = self._ik_model.ikine(starting_pose)
+        # q_start = self._ik_model.ikine(starting_pose)
 
-        self._robot.move_joints(q_start)
+        print(f'FAKE MOVE ROBOT TO IK SOLUTION FOR SAMPLED\n{starting_pose}')
+        # self._robot.move_joint_position(q_start, vel_scale=0.1)
 
         self._elapsed_steps = 0
 
@@ -161,18 +189,10 @@ class RealDrawerEnv(Env):
             raise Exception(f'Action needs to be a dict with the fields "motion" and "gripper"')
 
         action_motion = action['motion'] / max(np.abs(action['motion']).max(), 1)
-        self.controller.act(action_motion * self.dt)
+        # self.controller.act(action_motion * self.dt)
 
-        if 'gripper' in action:
-            self._set_gripper_absolute_goal(np.clip(action['gripper'], 0, 1))
-
-        handle_pos = self.door.joint_state['handle_joint'].position
-        switch = max(np.sign(self.door.joints['handle_joint'].q_max * 0.5 - handle_pos), 0.0)
-        # print(switch)
-
-        self.door.apply_joint_pos_cmds([0, 0], [5000 * switch, 1])
-
-        self.sim.update()
+        # if 'gripper' in action:
+        #     self._set_gripper_absolute_goal(np.clip(action['gripper'], 0, 1))
 
         obs = self.observation()
         done, success = self.is_terminated()
@@ -181,10 +201,14 @@ class RealDrawerEnv(Env):
         return obs, reward, done, {'success' : success}
 
     def observation(self):
-        out = {'position'      : (self._ref_in_panda.position - self._robot.ee_position).numpy(),
+        while self._ref_T_robot is None or self._robot.state.O_T_EE is None:
+            print('Waiting for reference frame and endeffector frame')
+            rospy.sleep(0.1)
+
+        out = {'position'      : (self._ref_T_robot * self._robot.state.O_T_EE)[:3, 3].flatten(),
             #    'gripper_width' : sum(self.robot.joint_state[j.name].position for j in self.gripper_joints),
-               'force'         : self._ref_in_panda.ext_force,
-               'torque'        : self._ref_in_panda.ext_torque}
+               'force'         : (self._ref_T_robot.R * self._robot.state.ext_force),
+               'torque'        : (self._ref_T_robot.R * self._robot.state.ext_torque)}
         
         return out
 
@@ -197,16 +221,36 @@ class RealDrawerEnv(Env):
         Returns:
             tuple: (Done, Success)
         """        
-        # Robot ran away
-        if not self.workspace.inside(self.eef.pose.position):
+        # Robot has faulted
+        if not self._robot.is_operational:
             return True, False
 
-        door_pos = self.door.joint_state['hinge_joint'].position
+        # Robot ran away
+        if not self.workspace.inside((self._ref_T_robot * self._robot.state.O_T_EE)[:3,3]):
+            print('EE is not in safety area')
+            return True, False
+
+        # TODO: ADD FORCE SAFETY CHECK
+
+        try:
+            tf_stamped = self.tfBuffer.lookup_transform(self._robot_frame, self._ref_frame, rospy.Time(0))
+            
+            quat = sm.UnitQuaternion(tf_stamped.transform.rotation.w,
+                                    (tf_stamped.transform.rotation.x,
+                                        tf_stamped.transform.rotation.y,
+                                        tf_stamped.transform.rotation.z))
+
+            self._robot_T_ref = sm.SE3.Rt(quat.R, (tf_stamped.transform.translation.x, 
+                                                    tf_stamped.transform.translation.y, 
+                                                    tf_stamped.transform.translation.z))
+            self._ref_T_robot = self._robot_T_ref.inv()
+        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
+            pass
 
         # print(peg_pos_in_target)
 
         # Horizontal goal, vertical goal
-        if door_pos >= self._target_position:
+        if self._ref_P_drawer is not None and self._ref_P_drawer.z >= self._target_position:
             return True, True
 
         return False, False
