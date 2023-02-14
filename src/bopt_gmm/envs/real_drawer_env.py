@@ -1,6 +1,8 @@
 import numpy as np
 import rospy
 import tf2_ros
+import roboticstoolbox as rp
+import spatialmath     as sm
 
 from functools   import lru_cache
 
@@ -37,6 +39,9 @@ from geometry_msgs.msg import WrenchStamped as WrenchStampedMsg
 
 class RealDrawerEnv(Env):
     def __init__(self, cfg, show_gui=False):
+        # Only used for IK
+        self._ik_model = rp.models.Panda()
+
         self.workspace = AABB(Point3(0.3, -0.85, 0), 
                               Point3(0.85, 0.85, 0.8))
 
@@ -56,9 +61,11 @@ class RealDrawerEnv(Env):
         self._ee_frame    = cfg.robot.ee_frame
 
         self._arm_reset_pose = cfg.robot.joint_reset_pose
-        robot_init_state     = cfg.robot.initial_pose
 
-        initial_rot = Quaternion(*robot_init_state.orientation) if len(robot_init_state.orientation) == 4 else Quaternion.from_euler(*robot_init_state.orientation)
+        self._ee_rot = self._ik_model.fkine(self._arm_reset_pose).R
+
+        self.starting_position_sampler = BoxSampler(cfg.initial_pose.position.min,
+                                                    cfg.initial_pose.position.max)
 
         # self._init_pose = Transform(Point3(*robot_init_state.position), initial_rot)
         # self.robot.set_joint_positions(cfg.robot.initial_pose.q, override_initial=True)
@@ -136,29 +143,14 @@ class RealDrawerEnv(Env):
 
         # Reset joint space position every couple of episodes
         if self._n_reset % self._joint_reset_every == 0:
-            
+            self._robot.move_joints(self._arm_rest_pose)
 
-        door_position  = Point3(*self.board_sampler.sample())
-        self.door.pose = Transform(door_position, Quaternion.from_euler(0, 0, 0))
+        starting_position = Point3(*self.starting_position_sampler.sample())
+        starting_pose     = sm.SE3.Rt(self._ee_rot, starting_position)
 
-        x_goal = self.eef.pose
-        # Only used to restore PID state after reset
-        reset_controller = CartesianController(self.robot, self.eef)
+        q_start = self._ik_model.ikine(starting_pose)
 
-        # Let the robot drop a bit
-        for _ in range(5):
-            reset_controller.act(x_goal)
-            self._set_gripper_absolute_goal(0.5)
-            self.sim.update()
-
-        # Wait for PID to restore the initial position
-        while (np.abs(reset_controller.delta) >= [1e-2, 0.1]).max():
-            # print(f'EE: {self.eef.pose}\nDesired: {x_goal}\nDelta: {np.abs(reset_controller.delta).max()}')
-            reset_controller.act(x_goal)
-            self._set_gripper_absolute_goal(0.5)
-            self.sim.update()
-
-        self.controller.reset()
+        self._robot.move_joints(q_start)
 
         self._elapsed_steps = 0
 
