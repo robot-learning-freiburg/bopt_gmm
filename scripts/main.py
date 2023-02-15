@@ -11,8 +11,6 @@ from math                       import inf as Infinity
 from omegaconf                  import OmegaConf
 from pathlib                    import Path
 from skopt                      import gp_minimize
-# from smac.facade.smac_bb_facade import SMAC4BB
-from smac.scenario.scenario     import Scenario
 from tqdm                       import tqdm
 
 from bopt_gmm.bopt import BOPTGMMCollectAndOptAgent, \

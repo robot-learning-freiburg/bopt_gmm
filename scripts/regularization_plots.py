@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import math
+import numpy  as np
 import pandas as pd
 
 from argparse import ArgumentParser
@@ -44,6 +45,23 @@ if __name__ == '__main__':
         ax.set_title(metric)
         ax.grid(True)
         
+        ac_mean = data[1].mean()
+        ac_std  = data[1].std()
+        ax.axhline(np.median(data[1]), color='#12DB00')
+        ax.axhline(ac_mean, color='#DB6300')
+        ax.axhline(ac_mean + ac_std, color='#5C4838', linestyle='--')
+        ax.axhline(ac_mean - ac_std, color='#5C4838', linestyle='--')
+
+        met_mean = data[0].mean()
+        met_std  = data[0].std()
+        met_med  = np.median(data[0])
+        ax.axvline(met_med,  color='#12DB00')
+        ax.axvline(met_mean, color='#DB6300')
+        ax.axvline(met_mean + met_std, color='#5C4838', linestyle='--')
+        ax.axvline(met_mean - met_std, color='#5C4838', linestyle='--')
+
+        ax.text(met_med, data[1].max(), f'{met_med:.2f}', ha='center', va='bottom', color='#12DB00')
+
         if ix == 0:
             ax.set_ylabel('Accuracy')
         
