@@ -1,9 +1,22 @@
 import numpy as np
 
+from ConfigSpace import Configuration, \
+                        ConfigurationSpace, \
+                        Float
+
 from dataclasses import dataclass, field
 from datetime    import datetime
+from functools   import lru_cache
 from itertools   import product
 from skopt       import Optimizer
+
+from smac        import HyperparameterOptimizationFacade, \
+                        BlackBoxFacade, \
+                        HyperbandFacade, \
+                        Scenario
+from smac.runhistory.dataclasses import TrialValue, \
+                                        TrialInfo
+
 from typing      import Callable, Any, Iterable, Tuple
 
 import bopt_gmm.gmm as lib_gmm
@@ -85,26 +98,63 @@ class BOPTGMMAgentBase(object):
             if self.state.current_update is not None:
                 self.step_optimizer(reward)
 
+    @property
+    @lru_cache(1)
+    def config_space(self) -> ConfigurationSpace:
+        cs = ConfigurationSpace()
+        if self.config.prior_range != 0.0:
+            cs.add_hyperparameters([Float(w, (-self.config.prior_range, self.config.prior_range), default=0) for w in self._weight_params])
+        if self.config.mean_range != 0.0:
+            cs.add_hyperparameters([Float(mp, (-self.config.mean_range, self.config.mean_range), default=0) for mp in self._mean_params])
+        return cs
+
+    @property
+    @lru_cache(1)
+    def _weight_params(self):
+        return [f'weight_{x}' for x in range(self.base_model.n_priors)]
+
+    @property
+    @lru_cache(1)
+    def _mean_params(self):
+        return sum([[f'mean_{y}_{x}' for x in range(self.base_model.n_dims)] for y in range(self.base_model.n_priors)], [])
+
     def init_optimizer(self, base_accuracy=None):
         self.state.bopt_state    = BOPTGMMAgentBase.BOPTState()
         self.state.base_accuracy = base_accuracy if base_accuracy is not None else len(self.state.success_trajectories) / len(self.state.trajectories)
 
-        optim_params = []
-        if self.config.prior_range != 0.0:
-            optim_params += [(-self.config.prior_range, self.config.prior_range)] * self.base_model.n_priors
-        if self.config.mean_range != 0.0:
-            optim_params += [(-self.config.mean_range, self.config.mean_range)] * self.base_model.n_priors * self.base_model.n_dims
-        if self.config.sigma_range != 0.0:
-            optim_params += [(-self.config.sigma_range, self.config.sigma_range)] * (len(self.base_model.state_dim) * len(self.base_model.prediction_dim) * self.base_model.n_priors)
-            self._cvar_indices = list(zip(*product(range(self.base_model.n_priors), self.base_model.state_dim, self.base_model.prediction_dim)))
+        # optim_params = []
+        # if self.config.prior_range != 0.0:
+        #     optim_params += [(-self.config.prior_range, self.config.prior_range)] * self.base_model.n_priors
+        # if self.config.mean_range != 0.0:
+        #     optim_params += [(-self.config.mean_range, self.config.mean_range)] * self.base_model.n_priors * self.base_model.n_dims
+        # if self.config.sigma_range != 0.0:
+        #     optim_params += [(-self.config.sigma_range, self.config.sigma_range)] * (len(self.base_model.state_dim) * len(self.base_model.prediction_dim) * self.base_model.n_priors)
+        #     self._cvar_indices = list(zip(*product(range(self.base_model.n_priors), self.base_model.state_dim, self.base_model.prediction_dim)))
 
-        self.state.gp_optimizer  = Optimizer(optim_params,
-                                             base_estimator=self.config.base_estimator,
-                                             n_initial_points=self.config.n_initial_points,
-                                             initial_point_generator=self.config.initial_p_gen,
-                                             acq_func=self.config.acq_func,
-                                             acq_optimizer=self.config.acq_optimizer)
+        # SKOPT OPTIMIZER
+        # self.state.gp_optimizer  = Optimizer(optim_params,
+        #                                      base_estimator=self.config.base_estimator,
+        #                                      n_initial_points=self.config.n_initial_points,
+        #                                      initial_point_generator=self.config.initial_p_gen,
+        #                                      acq_func=self.config.acq_func,
+        #                                      acq_optimizer=self.config.acq_optimizer)
         
+        # SMAC
+        self._scenario = Scenario(self.config_space, n_trials=100)
+
+
+        facade = {'hpo': HyperparameterOptimizationFacade,
+                  'hb' : HyperbandFacade,
+                  'bb' : BlackBoxFacade}[self.config.acq_optimizer]
+        
+        # intensifier = facade.get_intensifier(
+        #     self._scenario,
+        #     max_config_calls=1,  # We basically use one seed per config only
+        # )
+
+        self.state.gp_optimizer = facade(self._scenario,
+                                         lambda config, seed, budget : 0,
+                                         overwrite=True)
         print(f'Base Model:\nPriors: {self.base_model.pi()}\nMu: {self.base_model.mu()}')
 
         self.update_model()
@@ -126,16 +176,22 @@ class BOPTGMMAgentBase(object):
 
                 start_idx = 0
                 if self.config.prior_range != 0.0:
-                    u_priors   = self.state.current_update[start_idx:self.base_model.n_priors]
-                    start_idx += self.base_model.n_priors
+                    if type(self.state.current_update) != TrialInfo:
+                        u_priors   = self.state.current_update[start_idx:self.base_model.n_priors]
+                        start_idx += self.base_model.n_priors
+                    else:
+                        u_priors   = np.asarray([self.state.current_update.config[p] for p in self._weight_params])
                 else:
                     u_priors = None
 
                 if self.config.mean_range != 0.0:
                     mu         = self.base_model.mu()
                     mu_space   = mu.max(axis=0) - mu.min(axis=0)
-                    u_mean     = np.asarray(self.state.current_update[start_idx:start_idx + mu.size]).reshape(mu.shape) * mu_space
-                    start_idx += mu.size
+                    if type(self.state.current_update) != TrialInfo:
+                        u_mean     = np.asarray(self.state.current_update[start_idx:start_idx + mu.size]).reshape(mu.shape) * mu_space
+                        start_idx += mu.size
+                    else:
+                        u_mean     = np.asarray([self.state.current_update.config[p] for p in self._mean_params]).reshape(mu.shape) * mu_space
                 else:
                     u_mean = None
 
@@ -166,15 +222,20 @@ class BOPTGMMAgentBase(object):
 
     def _tell(self, state, reward):
         reward = reward if self.config.reward_processor == 'raw' else reward / self.state.bopt_state.reward_samples
-        self.state.gp_optimizer.tell(state, -reward)
+        # SKOPT
+        # self.state.gp_optimizer.tell(state, -reward)
+
+        # SMAC
+        self.state.gp_optimizer.tell(state, TrialValue(100 - reward))
+
         self.state.bopt_state.updates += 1
         self.state.bopt_state.reward   = 0.0
         self.state.bopt_state.reward_samples = 0
         if self.logger is not None:
             self.logger.log({
                 BOPT_TIME_SCALE: self.state.bopt_state.updates,
-                'bopt_y': self.state.gp_optimizer.yi[-1],
-                'bopt_x': self.state.gp_optimizer.Xi[-1]
+                'bopt_y': -reward,
+        #         'bopt_x': self.state.gp_optimizer.Xi[-1]
             })
 
     def reset(self):
@@ -189,9 +250,3 @@ class BOPTGMMAgentBase(object):
 
     def get_bopt_step(self):
         return self.state.bopt_state.updates if self.state.bopt_state is not None else 0
-
-
-def gen_gmm_from_trajectories(trajectories, deltaT, n_priors, gmm_type):
-    data = np.vstack(gen_trajectory_from_transitions(trajectories, deltaT))
-    return gmm_fit_em(n_priors, data, gmm_type)
-
