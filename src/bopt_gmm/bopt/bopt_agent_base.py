@@ -237,8 +237,10 @@ class BOPTGMMAgentBase(object):
         # SKOPT
         # self.state.gp_optimizer.tell(state, -reward)
 
+        reward = 100 - reward
+
         # SMAC
-        self.state.gp_optimizer.tell(state, TrialValue(100 - reward))
+        self.state.gp_optimizer.tell(state, TrialValue(reward))
 
         self.state.bopt_state.updates += 1
         self.state.bopt_state.reward   = 0.0
@@ -246,7 +248,7 @@ class BOPTGMMAgentBase(object):
         if self.logger is not None:
             self.logger.log({
                 BOPT_TIME_SCALE: self.state.bopt_state.updates,
-                'bopt_y': -reward,
+                'bopt_y': reward,
         #         'bopt_x': self.state.gp_optimizer.Xi[-1]
             })
 
