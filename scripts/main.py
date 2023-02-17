@@ -138,6 +138,7 @@ def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10,
         logger.define_metric('bopt accuracy',   BOPT_TIME_SCALE)
         logger.define_metric('bopt reward',     BOPT_TIME_SCALE)
         logger.define_metric('bopt mean steps', BOPT_TIME_SCALE)
+        logger.define_metric('n episode',       BOPT_TIME_SCALE)
         if deep_eval_length > 0:
             logger.define_metric('bopt deep eval accuracy', BOPT_TIME_SCALE)
 
@@ -155,6 +156,7 @@ def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10,
     else:
         live_plot_hook = None
 
+    n_ep = 0
     for bopt_step in tqdm(range(num_episodes), desc="Training BOPT model"):
         ep_acc = common.RunAccumulator()
         
@@ -209,6 +211,7 @@ def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10,
                            'success': info['success']})
                 ic_logger.log(ic)
             sub_ep_idx += 1
+            n_ep += 1
 
         if video_dir is not None:
             _, _, bopt_accuracy = ep_acc.get_stats()
@@ -219,7 +222,8 @@ def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10,
             bopt_mean_steps, bopt_reward, bopt_accuracy = ep_acc.get_stats()
             logger.log({'bopt mean steps': bopt_mean_steps,
                         'bopt reward'    : bopt_reward, 
-                        'bopt accuracy'  : bopt_accuracy})
+                        'bopt accuracy'  : bopt_accuracy,
+                        'n episode'      : n_ep})
 
     # Save final model
     if opt_model_dir is not None:
@@ -255,29 +259,24 @@ def bopt_regularized_training(env, agent, reg_data, regularizer,
     else:
         live_plot_hook = None
 
-    def post_step_hook_bopt_reg(_, env, agent, obs, post_obs, action, reward, done, info):
-        reg_val = regularizer(agent.model, agent.base_model, reg_data) if done else 0
-        common.post_step_hook_bopt(_, env, agent, obs, post_obs, action, reward + reg_val, done, info)
-
-    for n_ep in tqdm(range(num_episodes), desc="Training regularized BOPT model"):
-        ep_acc = common.RunAccumulator()
+    n_ep = 0
+    for n_run in tqdm(range(num_episodes), desc="Training regularized BOPT model"):
         
         # Save initial model and models every n-opts
         if opt_model_dir is not None:
             if agent.is_in_gp_stage() and agent.get_bopt_step() == 1:
                 agent.base_model.save_model(f'{opt_model_dir}/gmm_base.npy')
             
-            if n_ep % checkpoint_freq == 0:
-                agent.model.save_model(f'{opt_model_dir}/gmm_{n_ep}.npy')
+            if n_run % checkpoint_freq == 0:
+                agent.model.save_model(f'{opt_model_dir}/gmm_{n_run}.npy')
         
         # 
-        if n_ep > 0 and n_ep % checkpoint_freq == 0 and deep_eval_length > 0:
+        if n_run > 0 and n_run % checkpoint_freq == 0 and deep_eval_length > 0:
             # Fix location generation
-            eval_ic_path = f'{opt_model_dir}/../eval_{n_ep}_ic.csv' if opt_model_dir is not None else None
+            eval_ic_path = f'{opt_model_dir}/../eval_{n_run}_ic.csv' if opt_model_dir is not None else None
 
-            eval_agent = common.AgentWrapper(agent.model, 
-                                      agent.state.obs_transform, 
-                                      agent.config.gripper_command)
+            eval_agent = common.AgentWrapper(agent.model,
+                                             agent.config.gripper_command)
 
             e_acc, _, _ = evaluate_agent(env, eval_agent,
                                          num_episodes=deep_eval_length,
@@ -293,26 +292,32 @@ def bopt_regularized_training(env, agent, reg_data, regularizer,
             if min_reg_value <= reg_val:
                 break
             
+            reward = (1 - reg_val) * -100
             # Log reg value as reward when it is used to update the model
-            logger.log({'bopt reward' : reg_val,
+            logger.log({'bopt reward' : reward,
                         'bopt ep run' : 0})
-            agent.step_optimizer(reg_val)
+            agent.step_optimizer(reward)
         else:
             raise Exception(f'Failed to generate a feasible update complying with regularization in {tries} attempts')
 
         # Setup post-step hooks  
-        post_step_hooks = [post_step_hook_bopt_reg]
+        post_step_hooks = []  # common.post_step_hook_bopt]
 
         # Collecting data for next BOPT update
-        ep_return, step, info = common.run_episode(env, agent, max_steps, post_step_hook=common.post_step_hook_dispatcher(*post_step_hooks))
-        ep_acc.log_run(step + 1, ep_return, info['success'])
-        if ic_logger is not None:
-            ic = info['initial_conditions']
-            ic.update({'bopt_step': agent.get_bopt_step(), 
-                       'substep'  : 1, 
-                       'steps'    : step + 1, 
-                       'success'  : info['success']})
+        ep_acc = common.RunAccumulator()
+        for _ in range(agent.config.early_tell):
+            n_ep += 1
+            ep_return, step, info = common.run_episode(env, agent, max_steps, post_step_hook=common.post_step_hook_dispatcher(*post_step_hooks))
+            ep_acc.log_run(step + 1, ep_return, info['success'])
+            if ic_logger is not None:
+                ic = info['initial_conditions']
+                ic.update({'bopt_step': agent.get_bopt_step(), 
+                           'substep'  : 1, 
+                           'steps'    : step + 1, 
+                           'success'  : info['success']})
             ic_logger.log(ic)
+
+        agent.step_optimizer(ep_acc.get_stats()[1] / ep_acc._runs)
 
         # if video_dir is not None:
         #     _, _, bopt_accuracy = ep_acc.get_stats()
