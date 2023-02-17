@@ -47,6 +47,7 @@ class BOPTAgentConfig:
     acq_func         : str   = 'gp_hedge'
     acq_optimizer    : str   = 'auto'
     gripper_command  : float = 0.5
+    opt_dims         : list  = None
 
 
 class BOPTGMMAgentBase(object):
@@ -105,7 +106,9 @@ class BOPTGMMAgentBase(object):
         if self.config.prior_range != 0.0:
             cs.add_hyperparameters([Float(w, (-self.config.prior_range, self.config.prior_range), default=0) for w in self._weight_params])
         if self.config.mean_range != 0.0:
-            cs.add_hyperparameters([Float(mp, (-self.config.mean_range, self.config.mean_range), default=0) for mp in self._mean_params])
+            cs.add_hyperparameters([Float(mp, (-self.config.mean_range, self.config.mean_range), default=0) for mp in self._mean_params.keys()])
+        if self.config.sigma_range != 0.0:
+            raise NotImplementedError
         return cs
 
     @property
@@ -116,7 +119,11 @@ class BOPTGMMAgentBase(object):
     @property
     @lru_cache(1)
     def _mean_params(self):
-        return sum([[f'mean_{y}_{x}' for x in range(self.base_model.n_dims)] for y in range(self.base_model.n_priors)], [])
+        if self.config.opt_dims is not None and len(self.config.opt_dims) > 0:
+            return dict(sum([sum([[(f'mean_{d}_{y}_{x}', (y, x)) for x in self.base_model.semantic_dims()[d]]
+                                                                 for d in self.config.opt_dims], []) 
+                                                                 for y in range(self.base_model.n_priors)], []))
+        return dict(sum([[(f'mean_{y}_{x}', (y, x)) for x in range(self.base_model.n_dims)] for y in range(self.base_model.n_priors)], []))
 
     def init_optimizer(self, base_accuracy=None):
         self.state.bopt_state    = BOPTGMMAgentBase.BOPTState()
@@ -164,6 +171,7 @@ class BOPTGMMAgentBase(object):
         self.state.bopt_state.reward += reward
         self.state.bopt_state.reward_samples += 1
 
+        # if True:
         if self.state.bopt_state.step % min(max(int(1.0 / self.state.base_accuracy), self.config.early_tell), self.config.late_tell) == 0:
             print(f"Finished gp run {self.state.bopt_state.updates} ({self.state.bopt_state.step}). Return: {self.state.bopt_state.reward}. Let's go again!")
             self._tell(self.state.current_update, self.state.bopt_state.reward)    
@@ -191,7 +199,10 @@ class BOPTGMMAgentBase(object):
                         u_mean     = np.asarray(self.state.current_update[start_idx:start_idx + mu.size]).reshape(mu.shape) * mu_space
                         start_idx += mu.size
                     else:
-                        u_mean     = np.asarray([self.state.current_update.config[p] for p in self._mean_params]).reshape(mu.shape) * mu_space
+                        u_mean = np.zeros(mu.shape)
+                        for k, coords in self._mean_params.items():
+                            u_mean[coords] = self.state.current_update.config[k]
+                        u_mean *= mu_space
                 else:
                     u_mean = None
 

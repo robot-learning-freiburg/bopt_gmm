@@ -355,4 +355,7 @@ class GMM(object):
         """
         return self._means.copy() if dims is None else self._means.take(dims, axis=1)
 
+    def semantic_dims(self):
+        raise NotImplementedError
+
 add_gmm_model(GMM)

@@ -418,7 +418,8 @@ def main_bopt_agent(env, bopt_agent_config, conf_hash,
                                     acq_func=bopt_agent_config.acq_func,
                                     acq_optimizer=bopt_agent_config.acq_optimizer,
                                     gripper_command=bopt_agent_config.gripper_command,
-                                    base_accuracy=bopt_agent_config.base_accuracy)
+                                    base_accuracy=bopt_agent_config.base_accuracy,
+                                    opt_dims=bopt_agent_config.opt_dims,
 
         if bopt_agent_config.gmm.type in {'force', 'torque'}:
             # Not used anymore as observation processing is now done by the GMM

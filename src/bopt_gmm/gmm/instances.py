@@ -36,6 +36,10 @@ class GMMCart3D(GMM):
     def prediction_dim(self):
         return (3, 4, 5)
 
+    def semantic_dims(self):
+        return {'position': self.state_dim, 
+                'velocity': self.prediction_dim}
+
 add_gmm_model(GMMCart3D)
 
 
@@ -106,6 +110,12 @@ class GMMCart3DForce(GMM):
         new_model._force_scale = self._force_scale
         return new_model
 
+    def semantic_dims(self):
+        return {'position': self.state_dim[:3],
+                   'force': self.state_dim[3:], 
+                'velocity': self.prediction_dim[:3],
+                'force_vel': self.prediction_dim[3:]}
+
 add_gmm_model(GMMCart3DForce)
 
 
@@ -114,6 +124,12 @@ class GMMCart3DTorque(GMMCart3DForce):
         if type(obs_dict) == dict:
             obs_dict = np.hstack((obs_dict['position'], obs_dict['torque']))
         return super().predict(obs_dict, dims)[:,:3] if not full else super().predict(obs_dict, dims)
+
+    def semantic_dims(self):
+        return {'position': self.state_dim[:3],
+                  'torque': self.state_dim[3:], 
+                'velocity': self.prediction_dim[:3],
+              'torque_vel': self.prediction_dim[3:]}
 
 add_gmm_model(GMMCart3DTorque)
 

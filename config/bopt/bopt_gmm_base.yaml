@@ -11,6 +11,7 @@ n_initial_points: 10
 acq_func: "EI"
 acq_optimizer: "auto"
 gripper_command: 0.0
+opt_dims: null
 
 gmm:
   model: ???
