@@ -4,6 +4,7 @@ import pandas as pd
 
 from argparse import ArgumentParser
 from pathlib  import Path
+from tqdm     import tqdm
 
 import bopt_gmm.bopt.regularization as reg
 
@@ -45,7 +46,7 @@ if __name__ == '__main__':
 
     # positions = np.vstack([rollout(gmms[0][1], p[0][:len(gmms[0][1].state_dim)], True) for p in positions])
 
-    for gmm_path, gmm in gmms:
+    for gmm_path, gmm in tqdm(gmms, desc='Processing models...'):
         values.append([f(gmm, base_gmm, positions) for f in f_regs])
     
     print(''.join([' ' * 15] + [f'{f.__name__:>15}' for f in f_regs]))
