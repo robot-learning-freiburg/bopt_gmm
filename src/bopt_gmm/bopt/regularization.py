@@ -56,7 +56,7 @@ def f_dot(model_new, model_base, points):
     inv_mb = (inv_mb.T / b_norm).T
     inv_mn = (model_new.predict(points[:,:len(model_new.state_dim)], model_new.state_dim, full=False).T / b_norm).T
 
-    return np.nan_to_num((inv_mb * inv_mn).sum(axis=1), nan=1.0).mean()
+    return ((np.nan_to_num((inv_mb * inv_mn).sum(axis=1), nan=1.0) - 1)**2).mean()
 
 
 def gen_regularizer(cfg):
