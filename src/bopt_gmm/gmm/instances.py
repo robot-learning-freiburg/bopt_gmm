@@ -118,10 +118,5 @@ class GMMCart3DTorque(GMMCart3DForce):
 add_gmm_model(GMMCart3DTorque)
 
 
-GMM_TYPES = {'position': GMMCart3D,
-                'force': GMMCart3DForce,
-               'torque': GMMCart3DTorque}
-
-
 def load_gmm(gmm_config):
     return GMM.load_model(gmm_config.model)

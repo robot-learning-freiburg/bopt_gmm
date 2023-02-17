@@ -1,9 +1,9 @@
-from .gmm import GMM
+from .gmm import GMM, \
+                 add_gmm_model
 
 from .instances import GMMCart3D,       \
                        GMMCart3DForce,  \
                        GMMCart3DTorque, \
-                       GMM_TYPES,       \
                        load_gmm
 
 from .utils     import rollout

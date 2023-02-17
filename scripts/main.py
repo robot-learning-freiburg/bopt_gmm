@@ -24,7 +24,6 @@ from bopt_gmm.gmm import GMM,             \
                          GMMCart3D,       \
                          GMMCart3DForce,  \
                          GMMCart3DTorque, \
-                         GMM_TYPES,       \
                          load_gmm
 
 from bopt_gmm import bopt, \
@@ -491,10 +490,6 @@ if __name__ == '__main__':
                         ckpt_freq=args.ckpt_freq)
 
     elif args.mode == 'eval-gmm':
-        if cfg.bopt_agent.gmm.type not in GMM_TYPES:
-            print(f'Unknown GMM type {cfg.bopt_agent.gmm.type}. Options are: {GMM_TYPES.keys()}')
-            exit()
-
         gmm_path = Path(cfg.bopt_agent.gmm.model)
         gmm = GMM.load_model(cfg.bopt_agent.gmm.model)
         
