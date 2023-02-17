@@ -10,5 +10,5 @@ bopt_agent:
   base_accuracy: 1.0
   regularizer:
     f: p_joint
-    b: 30
-    min_val: 22
+    b: 1
+    min_val: 0.91

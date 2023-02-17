@@ -48,6 +48,7 @@ class BOPTAgentConfig:
     acq_optimizer    : str   = 'auto'
     gripper_command  : float = 0.5
     opt_dims         : list  = None
+    max_training_steps : int = 100
 
 
 class BOPTGMMAgentBase(object):
@@ -147,7 +148,7 @@ class BOPTGMMAgentBase(object):
         #                                      acq_optimizer=self.config.acq_optimizer)
         
         # SMAC
-        self._scenario = Scenario(self.config_space, n_trials=100)
+        self._scenario = Scenario(self.config_space, n_trials=self.config.max_training_steps)
 
 
         facade = {'hpo': HyperparameterOptimizationFacade,

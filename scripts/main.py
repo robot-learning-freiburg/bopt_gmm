@@ -420,6 +420,7 @@ def main_bopt_agent(env, bopt_agent_config, conf_hash,
                                     gripper_command=bopt_agent_config.gripper_command,
                                     base_accuracy=bopt_agent_config.base_accuracy,
                                     opt_dims=bopt_agent_config.opt_dims,
+                                    max_training_steps=bopt_agent_config.num_training_cycles)
 
         if bopt_agent_config.gmm.type in {'force', 'torque'}:
             # Not used anymore as observation processing is now done by the GMM
@@ -433,7 +434,9 @@ def main_bopt_agent(env, bopt_agent_config, conf_hash,
             agent = BOPTGMMAgent(base_gmm, config, logger=logger)
 
     if 'regularizer' not in bopt_agent_config:
-        bopt_training(env, agent, num_episodes=100, max_steps=600, 
+        bopt_training(env, agent,
+                      num_episodes=bopt_agent_config.num_training_cycles, 
+                      max_steps=bopt_agent_config.num_episode_steps, 
                       opt_model_dir=model_dir, logger=logger, 
                       video_dir=video_dir, show_force=show_force,
                       checkpoint_freq=ckpt_freq,
@@ -442,10 +445,12 @@ def main_bopt_agent(env, bopt_agent_config, conf_hash,
         regularizer = reg.gen_regularizer(bopt_agent_config.regularizer)
         bopt_regularized_training(env, agent, np.vstack(trajectories), regularizer, 
                                   min_reg_value=bopt_agent_config.regularizer.min_val,
-                                  num_episodes=100, max_steps=600, 
+                                  num_episodes=bopt_agent_config.num_training_cycles, 
+                                  max_steps=bopt_agent_config.num_episode_steps, 
                                   opt_model_dir=model_dir, logger=logger, 
                                   video_dir=video_dir, show_force=show_force, 
-                                  deep_eval_length=deep_eval_length)
+                                  deep_eval_length=deep_eval_length,
+                                  checkpoint_freq=ckpt_freq)
     # print(f'Accuracy: {acc} Mean return: {return_mean} Mean ep length: {mean_ep_length}')
     # bopt_res = agent.state.gp_optimizer.get_result()
     # print(f'F means: {bopt_res.x}\nReward: {bopt_res.fun}')
