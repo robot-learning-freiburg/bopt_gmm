@@ -18,7 +18,7 @@ class RunAccumulator:
 
     def get_stats(self):
         if self._runs == 0:
-            return 0.0, 0
+            return 0.0, 0, 0.0
         return self._steps / self._runs, self._reward, self._successes / self._runs
 
 
