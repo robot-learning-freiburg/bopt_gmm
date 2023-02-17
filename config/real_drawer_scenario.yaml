@@ -1,0 +1,11 @@
+defaults:
+  - env: real_drawer
+  - bopt@bopt_agent: bopt_gmm_base
+
+bopt_agent:
+  gmm: 
+    model: "models/gmm/drawer_em_5p.npy"
+    type: position
+    force_norm: 1
+  gripper_command: 0.5
+

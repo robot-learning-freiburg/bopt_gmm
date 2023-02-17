@@ -1,0 +1,24 @@
+type: real_drawer
+
+action_frequency: 30
+
+open_position: 0.15 # Meters
+
+reference_frame: obs_shelf_top_drawer
+drawer_frame: obs_shelf_bottom_drawer
+
+robot:
+  state_prefix: /franka_state_controller
+  controllers_prefix: /controllers
+  reference_frame: panda_link0
+  endeffector_frame: panda_EE
+  fingers: 
+    - panda_finger_joint1
+    - panda_finger_joint2
+  initial_pose:
+    q: [-1.85, 0.23, 1.64, -2.40, 0.10, 2.80, 1.67]  # Starting point for IK and for frequent robot reset
+    gripper_width: 0.05
+    position:
+      min: [0.1, 0.05, 0.3]
+      max: [0.3, 0.2, 0.45]
+  joint_reset_frequency: 5  # Return the robot to the original q pose every n steps

@@ -11,3 +11,4 @@ smac
 dearpygui
 tqdm
 pandas
+roboticstoolbox-python
