@@ -5,12 +5,15 @@ class BoxSampler(object):
         if len(b_min) != len(b_max):
             raise Exception(f'Box bounds need to be the same size. Min: {len(b_min)} Max: {len(b_max)}')
 
-        self.b_min = b_min
-        self.b_max = b_max
+        self.b_min = np.asarray(b_min)
+        self.b_max = np.asarray(b_max)
     
     def sample(self):
         return (np.random.random(len(self.b_min)) * (np.asarray(self.b_max) - np.asarray(self.b_min))) + np.asarray(self.b_min)
 
+    @property
+    def center(self):
+        return 0.5 * (self.b_min + self.b_max)
 
 class NoiseSampler(object):
     def __init__(self, dim, var, constant) -> None:

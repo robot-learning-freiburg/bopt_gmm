@@ -1,0 +1,14 @@
+defaults:
+  - env: sliding_door
+  - bopt@bopt_agent: bopt_gmm_base
+
+bopt_agent:
+  gmm: 
+    model: "models/gmm/door_em_5p.npy"
+    type: position
+    force_norm: 1
+  gripper_command: 0.5
+
+env:
+  observation:
+    with_noise: False

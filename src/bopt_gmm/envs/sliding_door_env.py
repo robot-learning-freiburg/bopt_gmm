@@ -28,7 +28,7 @@ from .utils     import BoxSampler, \
                        NoiseSampler
 
 
-class DoorEnv(Env):
+class SlidingDoorEnv(Env):
     def __init__(self, cfg, show_gui=False):
         self.sim = BasicSimulator(cfg.action_frequency, use_egl=not show_gui)
         self.sim.init('gui' if show_gui else 'direct')
@@ -41,14 +41,14 @@ class DoorEnv(Env):
         self.eef   = self.robot.get_link(cfg.robot.eef)
         self.gripper_joints = [self.robot.joints[f] for f in cfg.robot.fingers]
 
-        self._target_position = np.deg2rad(cfg.open_threshold)
+        self._target_position = cfg.goal_threshold
 
         self.table = self.sim.create_box(Vector3(0.6, 1, 0.05), 
                                          Transform.from_xyz(0.5, 0, -0.025), 
                                          color=(1, 1, 1, 1), 
                                          mass=0)
         # self.peg   = self.robot.links['peg'] #
-        self.door  = self.sim.load_urdf(cfg.door.path, useFixedBase=True)
+        self.door  = self.sim.load_urdf(cfg.door.path, useFixedBase=True, )
         self.reference_link = self.door.links[cfg.door.reference_link]
         self.board_sampler  = BoxSampler(cfg.door.sampler.min, 
                                          cfg.door.sampler.max)
@@ -61,7 +61,9 @@ class DoorEnv(Env):
 
         initial_rot = Quaternion(*robot_init_state.orientation) if len(robot_init_state.orientation) == 4 else Quaternion.from_euler(*robot_init_state.orientation)
 
-        self._init_pose = Transform(Point3(*robot_init_state.position), initial_rot)
+        self._robot_position_sampler = BoxSampler(robot_init_state.position.min,
+                                                  robot_init_state.position.max)
+        self._init_pose = Transform(Point3(*self._robot_position_sampler.center), initial_rot)
         self.robot.set_joint_positions(cfg.robot.initial_pose.q, override_initial=True)
         self.robot.set_joint_positions(self.eef.ik(self._init_pose, 1000), override_initial=True)
         self.robot.set_joint_positions({j.name: robot_init_state.gripper_width / len(self.gripper_joints) for j in self.gripper_joints}, override_initial=True)
@@ -139,13 +141,14 @@ class DoorEnv(Env):
 
         self.sim.reset()
 
-        door_position  = Point3(*self.board_sampler.sample())
-        self.door.pose = Transform(door_position, Quaternion.from_euler(0, 0, 0))
+        position_sample = self.board_sampler.sample()
+        door_position  = Point3(*position_sample[:3])
+        self.door.pose = Transform(door_position, Quaternion.from_euler(0, 0, position_sample[-1]))
 
         if self.visualizer is not None:
             self.visualizer.set_camera_position(self.door.pose.position + dbg_rel_pos, dbg_dist, dbg_pitch, dbg_yaw)
 
-        x_goal = self.eef.pose
+        x_goal = Transform(Point3(*self._robot_position_sampler.sample()), self.eef.pose.quaternion)
         # Only used to restore PID state after reset
         reset_controller = CartesianController(self.robot, self.eef)
 
@@ -177,12 +180,6 @@ class DoorEnv(Env):
 
         if 'gripper' in action:
             self._set_gripper_absolute_goal(np.clip(action['gripper'], 0, 1))
-
-        handle_pos = self.door.joint_state['handle_joint'].position
-        switch = max(np.sign(self.door.joints['handle_joint'].q_max * 0.5 - handle_pos), 0.0)
-        # print(switch)
-
-        self.door.apply_joint_pos_cmds([0, 0], [5000 * switch, 1])
 
         self.sim.update()
 
@@ -216,7 +213,7 @@ class DoorEnv(Env):
         if not self.workspace.inside(self.eef.pose.position):
             return True, False
 
-        door_pos = self.door.joint_state['hinge_joint'].position
+        door_pos = self.door.joint_state['door_joint'].position
 
         # print(peg_pos_in_target)
 

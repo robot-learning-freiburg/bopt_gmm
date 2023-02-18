@@ -1,27 +1,17 @@
 import numpy as np
 import rospy
 import tf2_ros
-import roboticstoolbox as rp
-import spatialmath     as sm
 
-from functools   import lru_cache
+from functools       import lru_cache
+try:
+    from rl_franka.panda import Panda
+    import roboticstoolbox as rp
+    import spatialmath     as sm
+except ModuleNotFoundError: # Just don't load this if we don't have the panda lib present
+    Panda = None
 
-from iai_bullet_sim import BasicSimulator,    \
-                           MultiBody,         \
-                           Link,              \
-                           PerspectiveCamera, \
-                           Transform,         \
-                           Point3,            \
-                           Vector3,           \
-                           Quaternion,        \
-                           Frame,             \
-                           AABB,              \
-                           MeshBody,          \
-                           CartesianController, \
-                           CartesianRelativePointController, \
-                           CartesianRelativeVirtualPointController, \
-                           CartesianRelativeVPointCOrientationController, \
-                           CartesianRelativePointCOrientationController
+from iai_bullet_sim import Point3,            \
+                           AABB
 
 from multiprocessing import RLock
 
@@ -32,7 +22,6 @@ from gym        import Env
 from .utils     import BoxSampler, \
                        NoiseSampler
 
-from rl_franka.panda import Panda
 
 from geometry_msgs.msg import WrenchStamped as WrenchStampedMsg
 
@@ -257,3 +246,10 @@ class RealDrawerEnv(Env):
 
     def _set_gripper_absolute_goal(self, target):
         self.robot.apply_joint_pos_cmds({j.name: self.robot.joints[j.name].q_max * target for j in self.gripper_joints}, [800]*2)
+
+
+# Let's just not force the installation of the entire FMM environment
+if Panda is None:
+    class RealDrawerEnv(object):
+        def __init__(self, *args, **kwargs):
+            raise NotImplementedError(f'The {type(self)} environment can only be instantiated in an environment with the real panda library installed.')

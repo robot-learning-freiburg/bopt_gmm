@@ -17,14 +17,17 @@ if __name__ == '__main__':
     # use "MY_MODULE.__path__" to localize it relative to your python package
     hydra.initialize(config_path="../config")
     cfg = hydra.compose(args.hy, overrides=args.overrides)
-    env = ENV_TYPES[cfg.env.type](cfg.env)
+    env = ENV_TYPES[cfg.env.type](cfg.env, show_gui=True)
 
     env.reset()
     
+    null_action = {'motion': np.zeros(3), 'gripper': 0}
+
     while not rospy.is_shutdown():
-        rospy.sleep(0.1)
-        print(env.observation())
+        rospy.sleep(1 / 30)
+        env.step(null_action)
+        # print(env.observation())
         terminated, success = env.is_terminated()
-        print(f'Is terminated: {terminated}\nIs success: {success}')
+        # print(f'Is terminated: {terminated}\nIs success: {success}')
         if terminated:
             env.reset()
