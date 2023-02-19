@@ -1,7 +1,6 @@
 import hydra
 from bopt_gmm.sim_control import start_web_app
-from bopt_gmm.envs        import PegEnv, \
-                                 DoorEnv
+from bopt_gmm.envs        import ENV_TYPES
 
 from argparse import ArgumentParser
 
@@ -16,5 +15,5 @@ if __name__ == "__main__":
     hydra.initialize(config_path="../config")
     cfg = hydra.compose(args.hy, overrides=args.overrides)
 
-    env = DoorEnv(cfg.env, True)
+    env = ENV_TYPES[cfg.env.type](cfg.env, True)
     start_web_app(cfg.teleoperate, env, args.out_dir)

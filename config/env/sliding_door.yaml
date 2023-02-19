@@ -2,14 +2,17 @@ type: sliding_door
 
 action_frequency: 30
 
-goal_threshold: 0.395 # Degrees
+goal_threshold: 0.15 # Degrees
 
 door:
-  path: package://bopt_gmm/objects/sliding_door.urdf
+  path: package://bopt_gmm/objects/hatch_door.urdf
+
+frame:
+  path: package://bopt_gmm/objects/hatch_frame.urdf
   reference_link: base_link
   sampler:
-    min: [0.65, -0.2, 0, -0.2]
-    max: [0.75, 0.2, 0,  0.2]
+    min: [0.3, -0.2, 0.04, -0.2]
+    max: [0.4,  0.2, 0.04,  0.2]
 
 noise:
   position:
@@ -25,8 +28,8 @@ robot:
     - panda_finger_joint2
   initial_pose:
     q: [0, -0.2, 0.0, -2.5, 1.6, 2.6, 0.7853981633974483, 0]  # only used for IK
-    orientation: [-2.2, 0, -1.57]
+    orientation: [-3.145, 0, 1.57]
     position:
-      min: [0.35, -0.1, 0.15]
-      max: [0.55,  0.1, 0.45]
+      min: [0.40, -0.05, 0.25]
+      max: [0.50,  0.05, 0.35]
     gripper_width: 0.05

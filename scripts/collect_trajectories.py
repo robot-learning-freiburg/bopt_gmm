@@ -11,7 +11,7 @@ from bopt_gmm import common, \
                      
 
 if __name__ == '__main__':
-    parser = ArgumentParser(description='Runs a .')
+    parser = ArgumentParser(description='Runs a model until a given number of trajectories are collected.')
     parser.add_argument('hy', type=str, help='Hydra config to use. Relative to root of "config" dir')
     parser.add_argument('out', default=None, help='File to save trajectories to. Dirs will be created if non-existent')
     parser.add_argument('--samples', default=15, type=int, help='Number of successful trajectories to collect.')
@@ -57,5 +57,6 @@ if __name__ == '__main__':
 
         samples += 1
 
+    trajectories = np.asarray(trajectories, dtype=object)
     np.savez(p, trajectories)
-    print(f'Overall accuracy: {successful_samples / samples}')
+    print(f'Model file: {p}\nOverall accuracy: {successful_samples / samples}')

@@ -34,7 +34,7 @@ class SlidingDoorEnv(Env):
         self.sim.init('gui' if show_gui else 'direct')
 
         self.dt        = 1 / cfg.action_frequency
-        self.workspace = AABB(Point3(0.3, -0.85, 0), 
+        self.workspace = AABB(Point3(0.2, -0.85, 0), 
                               Point3(0.85, 0.85, 0.8))
 
         self.robot = self.sim.load_urdf(cfg.robot.path, useFixedBase=True)
@@ -48,13 +48,20 @@ class SlidingDoorEnv(Env):
                                          color=(1, 1, 1, 1), 
                                          mass=0)
         # self.peg   = self.robot.links['peg'] #
-        self.door  = self.sim.load_urdf(cfg.door.path, useFixedBase=True, )
-        self.reference_link = self.door.links[cfg.door.reference_link]
-        self.board_sampler  = BoxSampler(cfg.door.sampler.min, 
-                                         cfg.door.sampler.max)
+        self.door  = self.sim.load_urdf(cfg.door.path,
+                                        useFixedBase=False,
+                                        use_self_collision='no_parents')
+
+        self.frame = self.sim.load_urdf(cfg.frame.path,
+                                        useFixedBase=True,
+                                        use_self_collision='no_parents')
+
+        self.reference_link = self.frame.links[cfg.frame.reference_link]
+        self.board_sampler  = BoxSampler(cfg.frame.sampler.min, 
+                                         cfg.frame.sampler.max)
 
         if self.sim.visualizer is not None:
-            self.sim.visualizer.set_camera_position(self.door.pose.position, 0.6, -25, 65)
+            self.sim.visualizer.set_camera_position(self.frame.pose.position, 0.6, -25, 65)
 
 
         robot_init_state = cfg.robot.initial_pose
@@ -77,7 +84,7 @@ class SlidingDoorEnv(Env):
         # print(f'Original: {temp_eef_pose}\nResolved EEF state: {self.eef.pose}\nDesired: {self._init_pose}\nPeg pos: {peg_position}')
 
         # self.controller     = CartesianRelativePointCOrientationController(self.robot, self.eef)
-        self.controller     = CartesianRelativeVPointCOrientationController(self.robot, self.eef, 0.02)
+        self.controller     = CartesianRelativeVPointCOrientationController(self.robot, self.eef, 0.1)
 
         self.render_camera  = PerspectiveCamera(self.sim, self.render_size[:2], 
                                                 50, 0.1, 10.0, 
@@ -97,7 +104,7 @@ class SlidingDoorEnv(Env):
         out = {} 
         for k, n in self.noise_samplers.items(): 
             out.update(dict(zip([f'{k}_noise_{x}' for x in 'xyz'], n.sample())))
-        out.update(dict(zip([f'door_pose_{x}' for x in 'x,y,z,qx,qy,qz,qw'.split(',')], self.door.pose.array())))
+        out.update(dict(zip([f'door_pose_{x}' for x in 'x,y,z,qx,qy,qz,qw'.split(',')], self.frame.pose.array())))
         out.update(dict(zip([f'ee_pose_{x}' for x in 'x,y,z,qx,qy,qz,qw'.split(',')], self.eef.pose.array())))
         return out
 
@@ -134,7 +141,7 @@ class SlidingDoorEnv(Env):
         if self.visualizer is not None:
             dbg_pos, dbg_dist, dbg_pitch, dbg_yaw = self.visualizer.get_camera_position()
 
-            dbg_rel_pos = dbg_pos - self.door.pose.position
+            dbg_rel_pos = dbg_pos - self.frame.pose.position
 
         for v in self.noise_samplers.values():
             v.reset()
@@ -143,10 +150,12 @@ class SlidingDoorEnv(Env):
 
         position_sample = self.board_sampler.sample()
         door_position  = Point3(*position_sample[:3])
-        self.door.pose = Transform(door_position, Quaternion.from_euler(0, 0, position_sample[-1]))
+        self.frame.pose = Transform(door_position, Quaternion.from_euler(0, np.deg2rad(0), position_sample[-1]))
+
+        self.door.pose = self.frame.pose.dot(Transform.from_xyz_rpy(0, -0.15, 0, 0, 0, np.deg2rad(180)))
 
         if self.visualizer is not None:
-            self.visualizer.set_camera_position(self.door.pose.position + dbg_rel_pos, dbg_dist, dbg_pitch, dbg_yaw)
+            self.visualizer.set_camera_position(self.frame.pose.position + dbg_rel_pos, dbg_dist, dbg_pitch, dbg_yaw)
 
         x_goal = Transform(Point3(*self._robot_position_sampler.sample()), self.eef.pose.quaternion)
         # Only used to restore PID state after reset
@@ -159,11 +168,16 @@ class SlidingDoorEnv(Env):
             self.sim.update()
 
         # Wait for PID to restore the initial position
+        reset_steps = 0
         while (np.abs(reset_controller.delta) >= [1e-2, 0.1]).max():
             # print(f'EE: {self.eef.pose}\nDesired: {x_goal}\nDelta: {np.abs(reset_controller.delta).max()}')
             reset_controller.act(x_goal)
             self._set_gripper_absolute_goal(0.5)
             self.sim.update()
+            if reset_steps > 1000:
+                print('Initial sample seems to have been bad. Resetting again.')
+                return self.reset()
+            reset_steps += 1
 
         self.controller.reset()
 
@@ -175,7 +189,7 @@ class SlidingDoorEnv(Env):
         if type(action) != dict:
             raise Exception(f'Action needs to be a dict with the fields "motion" and "gripper"')
 
-        action_motion = action['motion'] / max(np.abs(action['motion']).max(), 1)
+        action_motion = action['motion'] # / max(np.abs(action['motion']).max(), 1)
         self.controller.act(action_motion * self.dt)
 
         if 'gripper' in action:
@@ -213,7 +227,7 @@ class SlidingDoorEnv(Env):
         if not self.workspace.inside(self.eef.pose.position):
             return True, False
 
-        door_pos = self.door.joint_state['door_joint'].position
+        door_pos = self.frame.pose.inv().dot(self.door.pose).position.y
 
         # print(peg_pos_in_target)
 

@@ -1,7 +1,7 @@
 defaults:
-  - door_scenario
+  - sliding_door_scenario
 
-save_dir: demos_peg/
+save_dir: demos_sliding_door/
 show_gui: True
 max_episode_steps: 1000
 with_force: False
