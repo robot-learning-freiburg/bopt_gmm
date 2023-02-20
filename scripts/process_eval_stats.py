@@ -7,6 +7,7 @@ import yaml
 
 from argparse import ArgumentParser
 from pathlib  import Path
+from tqdm     import tqdm
 
 from bopt_gmm.gmm import GMM
 
@@ -33,7 +34,7 @@ if __name__ == '__main__':
     
     summary = []
 
-    for d in args.dirs:
+    for d in tqdm(args.dirs, desc='Processing directories'):
         pattern = f'{d}/eval_*_ic.csv'
 
         for p in glob.glob(pattern):
