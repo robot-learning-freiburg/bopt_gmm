@@ -1,34 +1,68 @@
-model,scenario,noise,accuracy
-models/gmm/door_3p.npy,door,0,0.52
-models/gmm/door_3p.npy,door,0.01,0.52
-models/gmm/door_3p.npy,door,0.02,0.22
-models/gmm/door_3p.npy,door,0.03,0.17
-models/gmm/door_3p.npy,door,0.05,0.06
-models/gmm/door_5p.npy,door,0,0.75
-models/gmm/door_5p.npy,door,0.01,0.55
-models/gmm/door_5p.npy,door,0.02,0.31
-models/gmm/door_5p.npy,door,0.03,0.24
-models/gmm/door_5p.npy,door,0.05,0.11
-models/gmm/door_7p.npy,door,0,0.68
-models/gmm/door_7p.npy,door,0.01,0.52
-models/gmm/door_7p.npy,door,0.02,0.46
-models/gmm/door_7p.npy,door,0.03,0.32
-models/gmm/door_7p.npy,door,0.05,0.09
+model                        ,scenario ,noise ,accuracy
+models/gmm/door_3p.npy       ,door     , 0    ,    0.52
+models/gmm/door_3p.npy       ,door     , 0.01 ,    0.52
+models/gmm/door_3p.npy       ,door     , 0.02 ,    0.22
+models/gmm/door_3p.npy       ,door     , 0.03 ,    0.17
+models/gmm/door_3p.npy       ,door     , 0.05 ,    0.06
+models/gmm/door_5p.npy       ,door     , 0    ,    0.75
+models/gmm/door_5p.npy       ,door     , 0.01 ,    0.55
+models/gmm/door_5p.npy       ,door     , 0.02 ,    0.31
+models/gmm/door_5p.npy       ,door     , 0.03 ,    0.24
+models/gmm/door_5p.npy       ,door     , 0.05 ,    0.11
+models/gmm/door_7p.npy       ,door     , 0    ,    0.68
+models/gmm/door_7p.npy       ,door     , 0.01 ,    0.52
+models/gmm/door_7p.npy       ,door     , 0.02 ,    0.46
+models/gmm/door_7p.npy       ,door     , 0.03 ,    0.32
+models/gmm/door_7p.npy       ,door     , 0.05 ,    0.09
 
-models/gmm/door_3p/n00_f.npy,door,0,0.31
-models/gmm/door_3p/n01_f.npy,door,0.01,0.31
-models/gmm/door_3p/n02_f.npy,door,0.02,0.34
-models/gmm/door_3p/n03_f.npy,door,0.03,0.18
-models/gmm/door_3p/n05_f.npy,door,0.05,0.11
+models/gmm/door_3p/n00_f.npy ,door     , 0    ,    0.31
+models/gmm/door_3p/n01_f.npy ,door     , 0.01 ,    0.31
+models/gmm/door_3p/n02_f.npy ,door     , 0.02 ,    0.34
+models/gmm/door_3p/n03_f.npy ,door     , 0.03 ,    0.18
+models/gmm/door_3p/n05_f.npy ,door     , 0.05 ,    0.11
 
-models/gmm/door_5p/n00_f.npy,door,0,0.65
-models/gmm/door_5p/n01_f.npy,door,0.01,0.26
-models/gmm/door_5p/n02_f.npy,door,0.02,0.30
-models/gmm/door_5p/n03_f.npy,door,0.03,0.26
-models/gmm/door_5p/n05_f.npy,door,0.05,0.07
+models/gmm/door_5p/n00_f.npy ,door     , 0    ,    0.65
+models/gmm/door_5p/n01_f.npy ,door     , 0.01 ,    0.26
+models/gmm/door_5p/n02_f.npy ,door     , 0.02 ,    0.30
+models/gmm/door_5p/n03_f.npy ,door     , 0.03 ,    0.26
+models/gmm/door_5p/n05_f.npy ,door     , 0.05 ,    0.07
 
-models/gmm/door_7p/n00_f.npy,door,0,0.41
-models/gmm/door_7p/n01_f.npy,door,0.01,0.21
-models/gmm/door_7p/n02_f.npy,door,0.02,0.23
-models/gmm/door_7p/n03_f.npy,door,0.03,0.15
-models/gmm/door_7p/n05_f.npy,door,0.05,0.1
+models/gmm/door_7p/n00_f.npy ,door     , 0    ,    0.41
+models/gmm/door_7p/n01_f.npy ,door     , 0.01 ,    0.21
+models/gmm/door_7p/n02_f.npy ,door     , 0.02 ,    0.23
+models/gmm/door_7p/n03_f.npy ,door     , 0.03 ,    0.15
+models/gmm/door_7p/n05_f.npy ,door     , 0.05 ,    0.1
+
+models/gmm/sd_3p.npy       ,sliding_door, 0    ,    0.51
+models/gmm/sd_3p.npy       ,sliding_door, 0.01 ,    0.44
+models/gmm/sd_3p.npy       ,sliding_door, 0.02 ,    0.38
+models/gmm/sd_3p.npy       ,sliding_door, 0.03 ,    0.32
+models/gmm/sd_3p.npy       ,sliding_door, 0.05 ,    0.26
+models/gmm/sd_5p.npy       ,sliding_door, 0    ,    0.65
+models/gmm/sd_5p.npy       ,sliding_door, 0.01 ,    0.48
+models/gmm/sd_5p.npy       ,sliding_door, 0.02 ,    0.41
+models/gmm/sd_5p.npy       ,sliding_door, 0.03 ,    0.37
+models/gmm/sd_5p.npy       ,sliding_door, 0.05 ,    0.3
+models/gmm/sd_7p.npy       ,sliding_door, 0    ,    0.49
+models/gmm/sd_7p.npy       ,sliding_door, 0.01 ,    0.47
+models/gmm/sd_7p.npy       ,sliding_door, 0.02 ,    0.43
+models/gmm/sd_7p.npy       ,sliding_door, 0.03 ,    0.36
+models/gmm/sd_7p.npy       ,sliding_door, 0.05 ,    0.33
+
+models/gmm/sd_3p/n00_f.npy ,sliding_door, 0    ,0.03
+models/gmm/sd_3p/n01_f.npy ,sliding_door, 0.01 ,0.13
+models/gmm/sd_3p/n02_f.npy ,sliding_door, 0.02 ,0.24
+models/gmm/sd_3p/n03_f.npy ,sliding_door, 0.03 ,0.19
+models/gmm/sd_3p/n05_f.npy ,sliding_door, 0.05 ,0.12
+
+models/gmm/sd_5p/n00_f.npy ,sliding_door, 0    ,0.08
+models/gmm/sd_5p/n01_f.npy ,sliding_door, 0.01 ,0
+models/gmm/sd_5p/n02_f.npy ,sliding_door, 0.02 ,0
+models/gmm/sd_5p/n03_f.npy ,sliding_door, 0.03 ,0.06
+models/gmm/sd_5p/n05_f.npy ,sliding_door, 0.05 ,0.15
+
+models/gmm/sd_7p/n00_f.npy ,sliding_door, 0    ,0.12
+models/gmm/sd_7p/n01_f.npy ,sliding_door, 0.01 ,0.04
+models/gmm/sd_7p/n02_f.npy ,sliding_door, 0.02 ,0.13
+models/gmm/sd_7p/n03_f.npy ,sliding_door, 0.03 ,0.35
+models/gmm/sd_7p/n05_f.npy ,sliding_door, 0.05 ,0.17

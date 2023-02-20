@@ -524,8 +524,8 @@ if __name__ == '__main__':
         agent = common.AgentWrapper(gmm, cfg.bopt_agent.gripper_command)
 
         acc, returns, lengths = evaluate_agent(env, agent,
-                                               num_episodes=100,
-                                               max_steps=600,
+                                               num_episodes=cfg.bopt_agent.num_training_cycles,
+                                               max_steps=cfg.bopt_agent.num_episode_steps,
                                                logger=logger,
                                                video_dir=video_dir,
                                                show_forces=args.show_gui,

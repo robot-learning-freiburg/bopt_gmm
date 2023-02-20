@@ -34,8 +34,8 @@ class SlidingDoorEnv(Env):
         self.sim.init('gui' if show_gui else 'direct')
 
         self.dt        = 1 / cfg.action_frequency
-        self.workspace = AABB(Point3(0.2, -0.85, 0), 
-                              Point3(0.85, 0.85, 0.8))
+        self.workspace = AABB(Point3(0.2, -0.65, 0), 
+                              Point3(0.85, 0.65, 0.8))
 
         self.robot = self.sim.load_urdf(cfg.robot.path, useFixedBase=True)
         self.eef   = self.robot.get_link(cfg.robot.eef)
@@ -84,7 +84,7 @@ class SlidingDoorEnv(Env):
         # print(f'Original: {temp_eef_pose}\nResolved EEF state: {self.eef.pose}\nDesired: {self._init_pose}\nPeg pos: {peg_position}')
 
         # self.controller     = CartesianRelativePointCOrientationController(self.robot, self.eef)
-        self.controller     = CartesianRelativeVPointCOrientationController(self.robot, self.eef, 0.1)
+        self.controller     = CartesianRelativeVPointCOrientationController(self.robot, self.eef, 0.02)
 
         self.render_camera  = PerspectiveCamera(self.sim, self.render_size[:2], 
                                                 50, 0.1, 10.0, 
