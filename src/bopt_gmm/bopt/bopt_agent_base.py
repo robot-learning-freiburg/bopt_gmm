@@ -109,7 +109,7 @@ class BOPTGMMAgentBase(object):
         if self.config.mean_range != 0.0:
             cs.add_hyperparameters([Float(mp, (-self.config.mean_range, self.config.mean_range), default=0) for mp in self._mean_params.keys()])
         if self.config.sigma_range != 0.0:
-            raise NotImplementedError
+            cs.add_hyperparameters([Float(sp, (-self.config.sigma_range, self.config.sigma_range), default=0) for sp in self._cvar_params.keys()])
         return cs
 
     @property
@@ -120,11 +120,37 @@ class BOPTGMMAgentBase(object):
     @property
     @lru_cache(1)
     def _mean_params(self):
-        if self.config.opt_dims is not None and len(self.config.opt_dims) > 0:
+        opt_dims = [d for d in self.config.opt_dims if '|' not in d] if self.config.opt_dims is not None else []
+        if len(opt_dims) > 0:
             return dict(sum([sum([[(f'mean_{d}_{y}_{x}', (y, x)) for x in self.base_model.semantic_dims()[d]]
                                                                  for d in self.config.opt_dims], []) 
                                                                  for y in range(self.base_model.n_priors)], []))
         return dict(sum([[(f'mean_{y}_{x}', (y, x)) for x in range(self.base_model.n_dims)] for y in range(self.base_model.n_priors)], []))
+
+    @property
+    @lru_cache(1)
+    def _cvar_params(self):
+        if self.config.opt_dims is not None and len(self.config.opt_dims) > 0:
+            out = {}
+            
+            vars  = [d for d in self.config.opt_dims if '|' not in d]
+            cvars = [d.split('|') for d in self.config.opt_dims if '|' in d]
+
+            for v in vars:
+                # Generate lower triangle coords
+                coords = sum([[(y, x) for x in self.base_model.semantic_dims()[v][:i+1]] for i, y in enumerate(self.base_model.semantic_dims()[v])], [])
+                
+                for d in range(self.base_model.n_priors):
+                    out.update({f'var_{v}_{d}_{y}_{x}': (d, y, x) for y, x in coords})
+            
+            for (state, inf) in cvars:
+                # Full NxM coords
+                coords = sum([[(y, x) for x in self.base_model.semantic_dims()[state]] for y in self.base_model.semantic_dims()[inf]], [])
+
+                for d in range(self.base_model.n_priors):
+                    out.update({f'cvar_{state}|{inf}_{d}_{y}_{x}': (d, y, x) for y, x in coords})
+            return out
+        return dict(sum([(f'cvar_{d}_{y}_{x}', (d, y, x)) for y, x in zip(*np.tril_indices(self.base_model.n_dims))], []))
 
     def init_optimizer(self, base_accuracy=None):
         self.state.bopt_state    = BOPTGMMAgentBase.BOPTState()
@@ -211,13 +237,19 @@ class BOPTGMMAgentBase(object):
                     sigma       = self.base_model.sigma()
                     sigma_space = sigma.max(axis=0) - sigma.min(axis=0)
                     unit_update = np.zeros_like(sigma)
-                    unit_update[self._cvar_indices[0], 
-                                self._cvar_indices[1], 
-                                self._cvar_indices[2]] = self.state.current_update[start_idx:start_idx + len(self._cvar_indices) * len(self._cvar_indices[0])]
+                    if type(self.state.current_update) != TrialInfo:
+                        unit_update[self._cvar_indices[0], 
+                                    self._cvar_indices[1], 
+                                    self._cvar_indices[2]] = self.state.current_update[start_idx:start_idx + len(self._cvar_indices) * len(self._cvar_indices[0])]
+                        unit_update = np.transpose(unit_update, [0, 2, 1])
+                    else:
+                        for n, c in self._cvar_params.items():
+                            unit_update[c] = self.state.current_update.config[n]
+                    
                     unit_update *= sigma_space
 
                     # Transpose to accomodate lower triangle indices
-                    u_sigma = np.transpose(unit_update, [0, 2, 1])[self.base_model._cvar_tril_idx]
+                    u_sigma = unit_update[self.base_model._cvar_tril_idx]
                 else:
                     u_sigma = None
 
