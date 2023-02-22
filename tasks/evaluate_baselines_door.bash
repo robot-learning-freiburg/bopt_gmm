@@ -1,0 +1,47 @@
+python scripts/job_runner.py 5 \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.00 bopt_agent.gmm.model=models/gmm/door_7p.npy --eval-out /tmp/baselines_door_7p_n00.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.01 bopt_agent.gmm.model=models/gmm/door_7p.npy --eval-out /tmp/baselines_door_7p_n01.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.02 bopt_agent.gmm.model=models/gmm/door_7p.npy --eval-out /tmp/baselines_door_7p_n02.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.03 bopt_agent.gmm.model=models/gmm/door_7p.npy --eval-out /tmp/baselines_door_7p_n03.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.05 bopt_agent.gmm.model=models/gmm/door_7p.npy --eval-out /tmp/baselines_door_7p_n05.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.00 bopt_agent.gmm.model=models/gmm/door_5p.npy --eval-out /tmp/baselines_door_5p_n00.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.01 bopt_agent.gmm.model=models/gmm/door_5p.npy --eval-out /tmp/baselines_door_5p_n01.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.02 bopt_agent.gmm.model=models/gmm/door_5p.npy --eval-out /tmp/baselines_door_5p_n02.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.03 bopt_agent.gmm.model=models/gmm/door_5p.npy --eval-out /tmp/baselines_door_5p_n03.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.05 bopt_agent.gmm.model=models/gmm/door_5p.npy --eval-out /tmp/baselines_door_5p_n05.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.00 bopt_agent.gmm.model=models/gmm/door_3p.npy --eval-out /tmp/baselines_door_3p_n00.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.01 bopt_agent.gmm.model=models/gmm/door_3p.npy --eval-out /tmp/baselines_door_3p_n01.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.02 bopt_agent.gmm.model=models/gmm/door_3p.npy --eval-out /tmp/baselines_door_3p_n02.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.03 bopt_agent.gmm.model=models/gmm/door_3p.npy --eval-out /tmp/baselines_door_3p_n03.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.05 bopt_agent.gmm.model=models/gmm/door_3p.npy --eval-out /tmp/baselines_door_3p_n05.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.00 bopt_agent.gmm.model=models/gmm/door_7p/n00_f.npy --eval-out /tmp/baselines_door_7p_n00_f.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.01 bopt_agent.gmm.model=models/gmm/door_7p/n01_f.npy --eval-out /tmp/baselines_door_7p_n01_f.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.02 bopt_agent.gmm.model=models/gmm/door_7p/n02_f.npy --eval-out /tmp/baselines_door_7p_n02_f.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.03 bopt_agent.gmm.model=models/gmm/door_7p/n03_f.npy --eval-out /tmp/baselines_door_7p_n03_f.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.05 bopt_agent.gmm.model=models/gmm/door_7p/n05_f.npy --eval-out /tmp/baselines_door_7p_n05_f.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.00 bopt_agent.gmm.model=models/gmm/door_5p/n00_f.npy --eval-out /tmp/baselines_door_5p_n00_f.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.01 bopt_agent.gmm.model=models/gmm/door_5p/n01_f.npy --eval-out /tmp/baselines_door_5p_n01_f.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.02 bopt_agent.gmm.model=models/gmm/door_5p/n02_f.npy --eval-out /tmp/baselines_door_5p_n02_f.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.03 bopt_agent.gmm.model=models/gmm/door_5p/n03_f.npy --eval-out /tmp/baselines_door_5p_n03_f.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.05 bopt_agent.gmm.model=models/gmm/door_5p/n05_f.npy --eval-out /tmp/baselines_door_5p_n05_f.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.00 bopt_agent.gmm.model=models/gmm/door_3p/n00_f.npy --eval-out /tmp/baselines_door_3p_n00_f.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.01 bopt_agent.gmm.model=models/gmm/door_3p/n01_f.npy --eval-out /tmp/baselines_door_3p_n01_f.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.02 bopt_agent.gmm.model=models/gmm/door_3p/n02_f.npy --eval-out /tmp/baselines_door_3p_n02_f.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.03 bopt_agent.gmm.model=models/gmm/door_3p/n03_f.npy --eval-out /tmp/baselines_door_3p_n03_f.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.05 bopt_agent.gmm.model=models/gmm/door_3p/n05_f.npy --eval-out /tmp/baselines_door_3p_n05_f.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.00 bopt_agent.gmm.model=models/gmm/door_7p/n00_js.npy --eval-out /tmp/baselines_door_7p_n00_js.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.01 bopt_agent.gmm.model=models/gmm/door_7p/n01_js.npy --eval-out /tmp/baselines_door_7p_n01_js.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.02 bopt_agent.gmm.model=models/gmm/door_7p/n02_js.npy --eval-out /tmp/baselines_door_7p_n02_js.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.03 bopt_agent.gmm.model=models/gmm/door_7p/n03_js.npy --eval-out /tmp/baselines_door_7p_n03_js.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.05 bopt_agent.gmm.model=models/gmm/door_7p/n05_js.npy --eval-out /tmp/baselines_door_7p_n05_js.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.00 bopt_agent.gmm.model=models/gmm/door_5p/n00_js.npy --eval-out /tmp/baselines_door_5p_n00_js.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.01 bopt_agent.gmm.model=models/gmm/door_5p/n01_js.npy --eval-out /tmp/baselines_door_5p_n01_js.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.02 bopt_agent.gmm.model=models/gmm/door_5p/n02_js.npy --eval-out /tmp/baselines_door_5p_n02_js.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.03 bopt_agent.gmm.model=models/gmm/door_5p/n03_js.npy --eval-out /tmp/baselines_door_5p_n03_js.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.05 bopt_agent.gmm.model=models/gmm/door_5p/n05_js.npy --eval-out /tmp/baselines_door_5p_n05_js.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.00 bopt_agent.gmm.model=models/gmm/door_3p/n00_js.npy --eval-out /tmp/baselines_door_3p_n00_js.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.01 bopt_agent.gmm.model=models/gmm/door_3p/n01_js.npy --eval-out /tmp/baselines_door_3p_n01_js.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.02 bopt_agent.gmm.model=models/gmm/door_3p/n02_js.npy --eval-out /tmp/baselines_door_3p_n02_js.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.03 bopt_agent.gmm.model=models/gmm/door_3p/n03_js.npy --eval-out /tmp/baselines_door_3p_n03_js.csv" \
+"python scripts/main.py door_dbopt --mode eval-gmm --deep-eval 100 --overrides env.noise.position.variance=0.05 bopt_agent.gmm.model=models/gmm/door_3p/n05_js.npy --eval-out /tmp/baselines_door_3p_n05_js.csv"
+python scripts/csv_fusion.py data/baselines_door.csv /tmp/baselines_door_*.csv

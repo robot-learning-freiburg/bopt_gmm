@@ -1,0 +1,15 @@
+python scripts/gen_gmm.py data/sliding_door_7p_n00_trajectories.npz --generator em --max-iter 500 --tol-cutting 0.05 --n-priors 7 --n-init 20 --modalities position doorpos --out models/gmm/sd_7p/n00_js.npy
+python scripts/gen_gmm.py data/sliding_door_7p_n01_trajectories.npz --generator em --max-iter 500 --tol-cutting 0.05 --n-priors 7 --n-init 20 --modalities position doorpos --out models/gmm/sd_7p/n01_js.npy
+python scripts/gen_gmm.py data/sliding_door_7p_n02_trajectories.npz --generator em --max-iter 500 --tol-cutting 0.05 --n-priors 7 --n-init 20 --modalities position doorpos --out models/gmm/sd_7p/n02_js.npy
+python scripts/gen_gmm.py data/sliding_door_7p_n03_trajectories.npz --generator em --max-iter 500 --tol-cutting 0.05 --n-priors 7 --n-init 20 --modalities position doorpos --out models/gmm/sd_7p/n03_js.npy
+python scripts/gen_gmm.py data/sliding_door_7p_n05_trajectories.npz --generator em --max-iter 500 --tol-cutting 0.05 --n-priors 7 --n-init 20 --modalities position doorpos --out models/gmm/sd_7p/n05_js.npy
+python scripts/gen_gmm.py data/sliding_door_5p_n00_trajectories.npz --generator em --max-iter 500 --tol-cutting 0.05 --n-priors 5 --n-init 20 --modalities position doorpos --out models/gmm/sd_5p/n00_js.npy
+python scripts/gen_gmm.py data/sliding_door_5p_n01_trajectories.npz --generator em --max-iter 500 --tol-cutting 0.05 --n-priors 5 --n-init 20 --modalities position doorpos --out models/gmm/sd_5p/n01_js.npy
+python scripts/gen_gmm.py data/sliding_door_5p_n02_trajectories.npz --generator em --max-iter 500 --tol-cutting 0.05 --n-priors 5 --n-init 20 --modalities position doorpos --out models/gmm/sd_5p/n02_js.npy
+python scripts/gen_gmm.py data/sliding_door_5p_n03_trajectories.npz --generator em --max-iter 500 --tol-cutting 0.05 --n-priors 5 --n-init 20 --modalities position doorpos --out models/gmm/sd_5p/n03_js.npy
+python scripts/gen_gmm.py data/sliding_door_5p_n05_trajectories.npz --generator em --max-iter 500 --tol-cutting 0.05 --n-priors 5 --n-init 20 --modalities position doorpos --out models/gmm/sd_5p/n05_js.npy
+python scripts/gen_gmm.py data/sliding_door_3p_n00_trajectories.npz --generator em --max-iter 500 --tol-cutting 0.05 --n-priors 3 --n-init 20 --modalities position doorpos --out models/gmm/sd_3p/n00_js.npy
+python scripts/gen_gmm.py data/sliding_door_3p_n01_trajectories.npz --generator em --max-iter 500 --tol-cutting 0.05 --n-priors 3 --n-init 20 --modalities position doorpos --out models/gmm/sd_3p/n01_js.npy
+python scripts/gen_gmm.py data/sliding_door_3p_n02_trajectories.npz --generator em --max-iter 500 --tol-cutting 0.05 --n-priors 3 --n-init 20 --modalities position doorpos --out models/gmm/sd_3p/n02_js.npy
+python scripts/gen_gmm.py data/sliding_door_3p_n03_trajectories.npz --generator em --max-iter 500 --tol-cutting 0.05 --n-priors 3 --n-init 20 --modalities position doorpos --out models/gmm/sd_3p/n03_js.npy
+python scripts/gen_gmm.py data/sliding_door_3p_n05_trajectories.npz --generator em --max-iter 500 --tol-cutting 0.05 --n-priors 3 --n-init 20 --modalities position doorpos --out models/gmm/sd_3p/n05_js.npy
