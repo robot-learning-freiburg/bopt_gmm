@@ -119,7 +119,8 @@ class SlidingDoorEnv(Env):
                                                     high=self.workspace.max.numpy()),
                           'gripper_width': BoxSpace(low=0.03, high=0.11, shape=(1,)),
                           'force':         BoxSpace(np.ones(3) * -5, np.ones(3) * 5),
-                          'torque':        BoxSpace(np.ones(3) * -5, np.ones(3) * 5)
+                          'torque':        BoxSpace(np.ones(3) * -5, np.ones(3) * 5),
+                          'doorpos':       BoxSpace(low=-0.15, high=1.5, shape=(1,))
                          })
 
     @property
@@ -203,11 +204,17 @@ class SlidingDoorEnv(Env):
         self._elapsed_steps += 1
         return obs, reward, done, {'success' : success}
 
+    @property
+    def door_position(self):
+        return self.frame.pose.inv().dot(self.door.pose).position.y
+
     def observation(self):
         out = {'position'      : (self.eef.pose.position - self.reference_link.pose.position).numpy(),
                'gripper_width' : sum(self.robot.joint_state[j.name].position for j in self.gripper_joints),
                'force'         : self.eef_ft_sensor.get().linear.numpy(),
-               'torque'        : self.eef_ft_sensor.get().angular.numpy()}
+               'torque'        : self.eef_ft_sensor.get().angular.numpy(),
+               'doorpos'       : self.door_position
+               }
         for k in out:
             if k in self.noise_samplers:
                 out[k] += self.noise_samplers[k].sample()
@@ -227,7 +234,7 @@ class SlidingDoorEnv(Env):
         if not self.workspace.inside(self.eef.pose.position):
             return True, False
 
-        door_pos = self.frame.pose.inv().dot(self.door.pose).position.y
+        door_pos = self.door_position
 
         # print(peg_pos_in_target)
 
