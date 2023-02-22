@@ -57,13 +57,17 @@ if __name__ == '__main__':
 
     dt = 1 / args.action_freq
 
-    gmm_type = MODEL_MAP['_'.join(sorted(args.modalities))]
     model_kwargs = {}
-    if group_norms is not None:
-        if gmm_type == gmm.GMMCart3DForce:
-            model_kwargs = {'force_scale': group_norms['force']}
-        elif gmm_type == gmm.GMMCart3DTorque:
-            model_kwargs = {'force_scale': group_norms['torque']}
+    try:
+        gmm_type = MODEL_MAP['_'.join(sorted(args.modalities))]
+        if group_norms is not None:
+            if gmm_type == gmm.GMMCart3DForce:
+                model_kwargs = {'force_scale': group_norms['force']}
+            elif gmm_type == gmm.GMMCart3DTorque:
+                model_kwargs = {'force_scale': group_norms['torque']}
+    except KeyError:
+        gmm_type = gmm.GMMCart3DJS
+        model_kwargs = {'dim_names' : sorted([m for m in args.modalities if m != 'position'])}
 
 
     if args.generator == 'seds':

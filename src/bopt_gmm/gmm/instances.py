@@ -1,5 +1,6 @@
 import numpy as np
 
+from functools import lru_cache
 from .gmm import GMM, add_gmm_model
 
 class GMMCart3D(GMM):
@@ -41,6 +42,61 @@ class GMMCart3D(GMM):
                 'velocity': self.prediction_dim}
 
 add_gmm_model(GMMCart3D)
+
+class GMMCart3DJS(GMM):
+    def __init__(self, priors, means, cvar, dim_names=[]):
+        super().__init__(priors, means, cvar)
+        self._dim_names = dim_names
+        self.GIVEN = tuple(range(3 + len(dim_names)))
+
+    def predict(self, obs_dict, dims=None, full=False):
+        dims = self.GIVEN if dims is None else dims
+        if type(obs_dict) == dict:
+            obs_dict = np.hstack([obs_dict[x] for x in ['position'] + self._dim_names])
+
+        return super().predict(obs_dict, dims)[:,:3] if not full else super().predict(obs_dict, dims)
+
+    def mu_pos(self):
+        return self.mu([0, 1, 2])
+
+    def mu_vel(self):
+        return self.mu([3, 4, 5])
+
+    def sigma_pos(self):
+        return self.sigma([0, 1, 2], [0, 1, 2])
+    
+    def sigma_vel(self):
+        return self.sigma([3, 4, 5], [3, 4, 5])
+    
+    def sigma_pos_vel(self):
+        return self.sigma([0, 1, 2], [3, 4, 5])
+    
+    def sigma_vel_pos(self):
+        return self.sigma([3, 4, 5], [0, 1, 2])
+
+    def _custom_data(self):
+        d = super()._custom_data()
+        d.update({'dim_names': self._dim_names})
+        return d
+
+    @property
+    def state_dim(self):
+        return self.GIVEN
+
+    @property
+    @lru_cache(1)
+    def prediction_dim(self):
+        return tuple([x + len(self.state_dim) for x in range(len(self.state_dim))])
+
+    @lru_cache(1)
+    def semantic_dims(self):
+        out = {'position': self.state_dim,
+               'velocity': self.prediction_dim}
+        out.update({d: x + len(self.state_dim) - len(self._dim_names) for x, d in enumerate(self._dim)})
+        out.update({f'{d}_vel': x + 2 * len(self.state_dim) - len(self._dim_names) for x, d in enumerate(self._dim)})
+        return out
+
+add_gmm_model(GMMCart3DJS)
 
 
 class GMMCart3DForce(GMM):

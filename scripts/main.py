@@ -470,6 +470,7 @@ if __name__ == '__main__':
     parser.add_argument('--deep-eval', default=0, type=int, help='Number of deep evaluation episodes to perform during bopt training.')
     parser.add_argument('--data-dir', default=None, help='Directory to save models and data to. Will be created if non-existent')
     parser.add_argument('--ckpt-freq', default=10, type=int, help='Frequency at which to save and evaluate models')
+    parser.add_argument('--eval-out', default=None, help='File to write results of evaluation to. Will write in append mode.')
     args = parser.parse_args()
 
     # Point hydra to the root of your config dir. Here it's hard-coded, but you can also
@@ -523,13 +524,20 @@ if __name__ == '__main__':
 
         agent = common.AgentWrapper(gmm, cfg.bopt_agent.gripper_command)
 
+        args.deep_eval = 10 if args.deep_eval == 0 else args.deep_eval
+
         acc, returns, lengths = evaluate_agent(env, agent,
-                                               num_episodes=cfg.bopt_agent.num_training_cycles,
+                                               num_episodes=args.deep_eval,
                                                max_steps=cfg.bopt_agent.num_episode_steps,
                                                logger=logger,
                                                video_dir=video_dir,
                                                show_forces=args.show_gui,
                                                verbose=1)
     
+        if args.eval_out is not None:
+            with open(args.eval_out, 'w') as f:
+                f.write('model,env,noise,accuracy,date\n')
+                f.write(f'{cfg.bopt_agent.gmm.model},{cfg.env.type},{cfg.env.noise.position.variance},{acc},{datetime.now()}\n')
+
     # Pos GMM result: 52%
     # F-GMM result: 40%
