@@ -28,11 +28,13 @@ if __name__ == '__main__':
         base_models = {n: f'{p}/{m}' for n, m in base_models.items()}
 
 
-    header  = 'path components noise eval accuracy model base'.split(' ')
+    header  = 'path components noise force tsteps opt weights means sigma eval accuracy model base'.split(' ')
     if args.base_models is not None:
         header += ['demo_base']
     
     summary = []
+
+    r_pattern = r'(_(\d+))?(_f|)_(\d)_(([a-z]+_)+|)n(\d\d)_([a-z]+)_(\d+)_(\d+)_([a-z]+)_([a-z]+)'
 
     for d in tqdm(args.dirs, desc='Processing directories'):
         pattern = f'{d}/eval_*_ic.csv'
@@ -46,10 +48,26 @@ if __name__ == '__main__':
                 print(f'Error raised while processing file {p}:\n{e}')
                 exit(0)
 
-            df = pd.read_csv(p)
+            try:
+                df = pd.read_csv(p)
+            except pd.errors.EmptyDataError:
+                print(f'Results file {p} is empty. Skipping...')
+                continue
 
-            noise = int(regex.findall(r"_n\d\d_", str(p))[0][2:-1]) * 0.01
-            components = int(regex.findall(r"_\d+_", str(p))[0][1:-1])
+            try:
+                _, train_steps, force, components, optim_groups, _, noise, _, prior, m, _, func = regex.findall(r_pattern, str(Path(p).parent.name))[0]
+            except (ValueError, IndexError) as e:
+                print(f'{p}\n{str(Path(p).parent.name)}\n{regex.findall(pattern, str(Path(p).parent.name))}:\n{e}')
+                exit(0)
+
+            train_steps  = int(train_steps) if train_steps is not '' else ''
+            force        = False if force == '' else True
+            components   = int(components)
+            optim_groups = [x for x in optim_groups.split('_') if x != '_']
+            noise        = int(noise) * 0.01
+            prior        = int(prior) * 0.01
+            m            = int(m) * 0.01
+            s            = 0.0
 
             # noise_vectors = np.vstack((df.position_noise_x.array, 
             #                            df.position_noise_y.array,
@@ -60,12 +78,12 @@ if __name__ == '__main__':
             base  = f'{p.parent}/models/gmm_base.npy'
 
             if args.base_models is None:
-                summary.append([p, components, noise, eval_num, df.success.mean(), model, base])
+                summary.append([p, components, noise, force, train_steps, ' '.join(optim_groups), prior, m, s, eval_num, df.success.mean(), model, base])
             else:
                 if components not in base_models:
                     print(f'No base model provided for {components} in {args.base_models}')
                     exit(-1)
-                summary.append([p, components, noise, eval_num, df.success.mean(), model, base, base_models[components]])
+                summary.append([p, components, noise, force, train_steps, ' '.join(optim_groups), prior, m, s, eval_num, df.success.mean(), model, base, base_models[components]])
 
     
     pd.DataFrame(summary, columns=header).to_csv(args.out, index=False)
