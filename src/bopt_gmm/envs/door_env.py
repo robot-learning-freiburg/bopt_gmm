@@ -106,13 +106,13 @@ class DoorEnv(Env):
     @property
     @lru_cache(1)
     def observation_space(self):
-        return DictSpace({'position':        BoxSpace(low=self.workspace.min.numpy(), 
-                                                      high=self.workspace.max.numpy()),
-                          'gripper_width':   BoxSpace(low=0.03, high=0.11, shape=(1,)),
-                          'force':           BoxSpace(np.ones(3) * -5, np.ones(3) * 5),
-                          'torque':          BoxSpace(np.ones(3) * -5, np.ones(3) * 5),
-                          'door_position':   BoxSpace(low=0.00, high=1.5708, shape=(1,)),
-                          'handle_position': BoxSpace(low=0.00, high=0.7854, shape=(1,))
+        return DictSpace({'position':      BoxSpace(low=self.workspace.min.numpy(), 
+                                                    high=self.workspace.max.numpy()),
+                          'gripper_width': BoxSpace(low=0.03, high=0.11, shape=(1,)),
+                          'force':         BoxSpace(np.ones(3) * -5, np.ones(3) * 5),
+                          'torque':        BoxSpace(np.ones(3) * -5, np.ones(3) * 5),
+                          'doorpos':       BoxSpace(low=0.00, high=1.5708, shape=(1,)),
+                          'handlepos':     BoxSpace(low=0.00, high=0.7854, shape=(1,))
                          })
 
     @property
@@ -199,8 +199,8 @@ class DoorEnv(Env):
                'gripper_width' : sum(self.robot.joint_state[j.name].position for j in self.gripper_joints),
                'force'         : self.eef_ft_sensor.get().linear.numpy(),
                'torque'        : self.eef_ft_sensor.get().angular.numpy(),
-               'door_position' : self.door.joint_state['hinge_joint'].position,
-               'handle_position' : self.door.joint_state['handle_joint'].position}
+               'doorpos'       : self.door.joint_state['hinge_joint'].position,
+               'handlepos'     : self.door.joint_state['handle_joint'].position}
         for k in out:
             if k in self.noise_samplers:
                 out[k] += self.noise_samplers[k].sample()
