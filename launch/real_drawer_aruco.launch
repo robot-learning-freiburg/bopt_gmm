@@ -4,5 +4,5 @@
         <arg name="marker_dict" value="DICT_4X4_50"/>
         <arg name="aliases" value="{obs_shelf_top_drawer: 19, obs_shelf_bottom_drawer: 21}"/>
     </include>
-    <node name="tower_camera_control" pkg="fmm" type="fmm_set_camera.bash" args="-0.6 0.2 5"/>
+    <node name="tower_camera_control" pkg="fmm" type="fmm_set_camera.bash" args="-0.6 0.5 5"/>
 </launch>
