@@ -92,8 +92,8 @@ class GMMCart3DJS(GMM):
     def semantic_dims(self):
         out = {'position': self.state_dim,
                'velocity': self.prediction_dim}
-        out.update({d: x + len(self.state_dim) - len(self._dim_names) for x, d in enumerate(self._dim)})
-        out.update({f'{d}_vel': x + 2 * len(self.state_dim) - len(self._dim_names) for x, d in enumerate(self._dim)})
+        out.update({d: (x + len(self.state_dim) - len(self._dim_names),) for x, d in enumerate(self._dim_names)})
+        out.update({f'{d}_vel': (x + 2 * len(self.state_dim) - len(self._dim_names),) for x, d in enumerate(self._dim_names)})
         return out
 
 add_gmm_model(GMMCart3DJS)

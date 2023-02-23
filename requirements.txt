@@ -12,3 +12,4 @@ dearpygui
 tqdm
 pandas
 roboticstoolbox-python
+stable-baselines3

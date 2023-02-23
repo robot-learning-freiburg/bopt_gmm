@@ -60,7 +60,7 @@ if __name__ == '__main__':
                 print(f'{p}\n{str(Path(p).parent.name)}\n{regex.findall(pattern, str(Path(p).parent.name))}:\n{e}')
                 exit(0)
 
-            train_steps  = int(train_steps) if train_steps is not '' else ''
+            train_steps  = int(train_steps) if train_steps != '' else ''
             force        = False if force == '' else True
             components   = int(components)
             optim_groups = [x for x in optim_groups.split('_') if x != '_']
