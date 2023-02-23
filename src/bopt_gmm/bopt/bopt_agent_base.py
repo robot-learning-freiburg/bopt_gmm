@@ -33,11 +33,15 @@ def no_op(x):
 BOPT_TIME_SCALE = 'bopt_step'
 
 @dataclass
-class BOPTAgentConfig:
-    f_success        : Callable[[Any, Any, Any, float, bool], bool] = base_success
+class GMMOptConfig:
     prior_range      : float = 0.15
     mean_range       : float = 0.05
     sigma_range      : float = 0.0
+    opt_dims         : list  = None
+
+@dataclass
+class BOPTAgentConfig(GMMOptConfig):
+    f_success        : Callable[[Any, Any, Any, float, bool], bool] = base_success
     early_tell       : int   = 5
     late_tell        : int   = 100000
     reward_processor : str   = 'mean'    # mean, raw
@@ -47,58 +51,14 @@ class BOPTAgentConfig:
     acq_func         : str   = 'gp_hedge'
     acq_optimizer    : str   = 'auto'
     gripper_command  : float = 0.5
-    opt_dims         : list  = None
     max_training_steps : int = 100
 
 
-class BOPTGMMAgentBase(object):
-    @dataclass
-    class BOPTState:
-        step    : int   = 0
-        updates : int   = 0
-        reward  : float = 0.0
-        reward_samples : int = 0
-    
-    @dataclass
-    class State:
-        n_step               : int  = 0
-        trajectories         : list = field(default_factory=lambda: [[]]) 
-        success_trajectories : list = field(default_factory=list) 
-        gp_optimizer         : Any  = None
-        current_update       : Any  = None
-        bopt_state           : Any  = None
-        obs_transform        : Any  = no_op
-
-
-    def __init__(self, base_gmm, config: BOPTAgentConfig, obs_transform = no_op, logger : LoggerBase=None) -> None:
-        self.base_model = base_gmm
+class GMMOptAgent(object):
+    def __init__(self, gmm, config):
+        self.base_model = gmm
         self.config     = config
-        self.model      = base_gmm
-        self.logger     = logger
-
-        self.state = BOPTGMMAgentBase.State(obs_transform=obs_transform)
-
-        if self.logger is not None:
-            self.logger.define_metric('bopt_x', BOPT_TIME_SCALE)
-            self.logger.define_metric('bopt_y', BOPT_TIME_SCALE)
-
-    def predict(self, observation):
-        observation = self.state.obs_transform(observation)
-        return {'motion': self.model.predict(observation).flatten(), 'gripper': self.config.gripper_command}
-
-    def step(self, prior_obs, posterior_obs, action, reward, done):
-        transition = (prior_obs, posterior_obs, action, reward, done)
-        self.state.n_step += 1
-        self.state.trajectories[-1].append(transition)
-        if self.config.f_success(*transition):
-            self.state.success_trajectories.append(self.state.trajectories[-1])
-            # print(f'Collected a successful trajectory. Now got {len(self.state.success_trajectories)}')
-        if done:
-            self.state.trajectories.append([])
-            
-            # If GP-Optimization is in progress, step it!
-            if self.state.current_update is not None:
-                self.step_optimizer(reward)
+        self.model      = gmm
 
     @property
     @lru_cache(1)
@@ -151,6 +111,105 @@ class BOPTGMMAgentBase(object):
                     out.update({f'cvar_{state}|{inf}_{d}_{y}_{x}': (d, y, x) for y, x in coords})
             return out
         return dict(sum([(f'cvar_{d}_{y}_{x}', (d, y, x)) for y, x in zip(*np.tril_indices(self.base_model.n_dims))], []))
+
+    def update_model(self, parameter_update):
+        self.state.current_update = self.state.gp_optimizer.ask()
+
+        start_idx = 0
+        if self.config.prior_range != 0.0:
+            if type(self.state.current_update) != TrialInfo:
+                u_priors   = self.state.current_update[start_idx:self.base_model.n_priors]
+                start_idx += self.base_model.n_priors
+            else:
+                u_priors   = np.asarray([self.state.current_update.config[p] for p in self._weight_params])
+        else:
+            u_priors = None
+
+        if self.config.mean_range != 0.0:
+            mu         = self.base_model.mu()
+            mu_space   = mu.max(axis=0) - mu.min(axis=0)
+            if type(self.state.current_update) != TrialInfo:
+                u_mean     = np.asarray(self.state.current_update[start_idx:start_idx + mu.size]).reshape(mu.shape) * mu_space
+                start_idx += mu.size
+            else:
+                u_mean = np.zeros(mu.shape)
+                for k, coords in self._mean_params.items():
+                    u_mean[coords] = self.state.current_update.config[k]
+                u_mean *= mu_space
+        else:
+            u_mean = None
+
+        if self.config.sigma_range != 0.0:
+            sigma       = self.base_model.sigma()
+            sigma_space = sigma.max(axis=0) - sigma.min(axis=0)
+            unit_update = np.zeros_like(sigma)
+            if type(self.state.current_update) != TrialInfo:
+                unit_update[self._cvar_indices[0], 
+                            self._cvar_indices[1], 
+                            self._cvar_indices[2]] = self.state.current_update[start_idx:start_idx + len(self._cvar_indices) * len(self._cvar_indices[0])]
+                unit_update = np.transpose(unit_update, [0, 2, 1])
+            else:
+                for n, c in self._cvar_params.items():
+                    unit_update[c] = self.state.current_update.config[n]
+            
+            unit_update *= sigma_space
+
+            # Transpose to accomodate lower triangle indices
+            u_sigma = unit_update[self.base_model._cvar_tril_idx]
+        else:
+            u_sigma = None
+
+        self.model = self.base_model.update_gaussian(u_priors, u_mean, u_sigma)
+    
+
+class BOPTGMMAgentBase(GMMOptAgent):
+    @dataclass
+    class BOPTState:
+        step    : int   = 0
+        updates : int   = 0
+        reward  : float = 0.0
+        reward_samples : int = 0
+    
+    @dataclass
+    class State:
+        n_step               : int  = 0
+        trajectories         : list = field(default_factory=lambda: [[]]) 
+        success_trajectories : list = field(default_factory=list) 
+        gp_optimizer         : Any  = None
+        current_update       : Any  = None
+        bopt_state           : Any  = None
+        obs_transform        : Any  = no_op
+
+
+    def __init__(self, base_gmm, config: BOPTAgentConfig, obs_transform = no_op, logger : LoggerBase=None) -> None:
+        self.base_model = base_gmm
+        self.config     = config
+        self.model      = base_gmm
+        self.logger     = logger
+
+        self.state = BOPTGMMAgentBase.State(obs_transform=obs_transform)
+
+        if self.logger is not None:
+            self.logger.define_metric('bopt_x', BOPT_TIME_SCALE)
+            self.logger.define_metric('bopt_y', BOPT_TIME_SCALE)
+
+    def predict(self, observation):
+        observation = self.state.obs_transform(observation)
+        return {'motion': self.model.predict(observation).flatten(), 'gripper': self.config.gripper_command}
+
+    def step(self, prior_obs, posterior_obs, action, reward, done):
+        transition = (prior_obs, posterior_obs, action, reward, done)
+        self.state.n_step += 1
+        self.state.trajectories[-1].append(transition)
+        if self.config.f_success(*transition):
+            self.state.success_trajectories.append(self.state.trajectories[-1])
+            # print(f'Collected a successful trajectory. Now got {len(self.state.success_trajectories)}')
+        if done:
+            self.state.trajectories.append([])
+            
+            # If GP-Optimization is in progress, step it!
+            if self.state.current_update is not None:
+                self.step_optimizer(reward)
 
     def init_optimizer(self, base_accuracy=None):
         self.state.bopt_state    = BOPTGMMAgentBase.BOPTState()
@@ -209,52 +268,7 @@ class BOPTGMMAgentBase(object):
             try:
                 self.state.current_update = self.state.gp_optimizer.ask()
 
-                start_idx = 0
-                if self.config.prior_range != 0.0:
-                    if type(self.state.current_update) != TrialInfo:
-                        u_priors   = self.state.current_update[start_idx:self.base_model.n_priors]
-                        start_idx += self.base_model.n_priors
-                    else:
-                        u_priors   = np.asarray([self.state.current_update.config[p] for p in self._weight_params])
-                else:
-                    u_priors = None
-
-                if self.config.mean_range != 0.0:
-                    mu         = self.base_model.mu()
-                    mu_space   = mu.max(axis=0) - mu.min(axis=0)
-                    if type(self.state.current_update) != TrialInfo:
-                        u_mean     = np.asarray(self.state.current_update[start_idx:start_idx + mu.size]).reshape(mu.shape) * mu_space
-                        start_idx += mu.size
-                    else:
-                        u_mean = np.zeros(mu.shape)
-                        for k, coords in self._mean_params.items():
-                            u_mean[coords] = self.state.current_update.config[k]
-                        u_mean *= mu_space
-                else:
-                    u_mean = None
-
-                if self.config.sigma_range != 0.0:
-                    sigma       = self.base_model.sigma()
-                    sigma_space = sigma.max(axis=0) - sigma.min(axis=0)
-                    unit_update = np.zeros_like(sigma)
-                    if type(self.state.current_update) != TrialInfo:
-                        unit_update[self._cvar_indices[0], 
-                                    self._cvar_indices[1], 
-                                    self._cvar_indices[2]] = self.state.current_update[start_idx:start_idx + len(self._cvar_indices) * len(self._cvar_indices[0])]
-                        unit_update = np.transpose(unit_update, [0, 2, 1])
-                    else:
-                        for n, c in self._cvar_params.items():
-                            unit_update[c] = self.state.current_update.config[n]
-                    
-                    unit_update *= sigma_space
-
-                    # Transpose to accomodate lower triangle indices
-                    u_sigma = unit_update[self.base_model._cvar_tril_idx]
-                else:
-                    u_sigma = None
-
-                self.model = self.base_model.update_gaussian(u_priors, u_mean, u_sigma)
-                
+                super().update_model(self.state.current_update)
                 print(f'Updated Model:\nPriors: {self.model.pi()}\nMu: {self.model.mu()}\nSigma-Delta: {u_sigma}')
                 break
             except ValueError as e:
