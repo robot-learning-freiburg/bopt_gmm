@@ -54,7 +54,7 @@ class RealDrawerEnv(Env):
         self._robot_frame = cfg.robot.reference_frame
         self._ee_frame    = cfg.robot.endeffector_frame
 
-        self._arm_reset_pose = cfg.robot.initial_pose.q
+        self._arm_reset_pose = np.asarray(cfg.robot.initial_pose.q)
 
         self._ee_rot = self._ik_model.fkine(self._arm_reset_pose).R
 
@@ -129,6 +129,12 @@ class RealDrawerEnv(Env):
     def render(self, mode='rgb_array'):
         return None
 
+    def _is_tower_collision(self, q=None):
+        q = self._robot.state.q if q is None else q
+        # Experimentally found -0.6 * q0^2 - 0.45 as approximation for tower collisions
+        q1_threshold = -1 * q[0]**6 - 0.45
+        return q[1] < q1_threshold
+
     def reset(self):
         # Establish reference frame if it's not existing
         while self._robot_T_ref is None:
@@ -147,28 +153,46 @@ class RealDrawerEnv(Env):
             except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
                 print(f'Trying to lookup reference frame {self._ref_frame} in {self._robot_frame}')
 
+        print('Bla')
         while self._ref_P_drawer is None or self._ref_P_drawer.z > 0.015:
-            print('Waiting for drawer to be registered or reset...')
+            if self._ref_P_drawer is None:
+                print('Waiting for drawer to be registered')
+            else:
+                print(f'Waiting for drawer position to be less than 0.015. Currently: {self._ref_P_drawer.z}')
             rospy.sleep(0.3)
 
+        print('Bla2')
         while not self._robot.is_operational:
             print('Waiting for robot to become operational again...')
             rospy.sleep(0.3)
 
+        print('Bla3')
         # Reset joint space position every couple of episodes
         if self._n_reset % self._joint_reset_every == 0:
-        #     self._robot.move_joints(self._arm_rest_pose)
+            self._robot.move_joint_position(self._arm_reset_pose, 0.15)
             print('FAKE MOVE ROBOT TO INITIAL Q')
 
+        print('Bla4')
+        while True:
+            starting_position = Point3(*self.starting_position_sampler.sample())
+            starting_pose     = sm.SE3.Rt(self._ee_rot, starting_position)
 
-        starting_position = Point3(*self.starting_position_sampler.sample())
-        starting_pose     = sm.SE3.Rt(self._ee_rot, starting_position)
+            q_start, ik_success, failure, _, residual = self._ik_model.ik_lm_chan(starting_pose, q0=self._arm_reset_pose)
 
-        # q_start = self._ik_model.ikine(starting_pose)
+            if ik_success:
+                if self._is_tower_collision(q_start):
+                    print('IK SOLUTION WOULD COLLIDE WITH TOWER. GOING AGAIN.')
+                    continue
 
-        print(f'FAKE MOVE ROBOT TO IK SOLUTION FOR SAMPLED\n{starting_pose}')
-        # self._robot.move_joint_position(q_start, vel_scale=0.1)
+                print(f'FAKE MOVE ROBOT TO IK SOLUTION FOR SAMPLED\n{starting_pose}\nQ: {q_start}')
+                break
+            else:
+                print(f'IK FAILED! RESIDUAL {residual} "{failure}"\n{starting_pose}')
 
+        print('Bla5')
+        self._robot.move_joint_position(q_start, vel_scale=0.15)
+
+        print('Bla6')
         self._elapsed_steps = 0
 
         return self.observation()
@@ -182,6 +206,8 @@ class RealDrawerEnv(Env):
 
         # if 'gripper' in action:
         #     self._set_gripper_absolute_goal(np.clip(action['gripper'], 0, 1))
+
+        rospy.sleep(1 / 30)
 
         obs = self.observation()
         done, success = self.is_terminated()
@@ -212,11 +238,16 @@ class RealDrawerEnv(Env):
         """        
         # Robot has faulted
         if not self._robot.is_operational:
+            print('Termination due to inoperative robot')
             return True, False
 
         # Robot ran away
         if not self.workspace.inside((self._ref_T_robot * self._robot.state.O_T_EE)[:3,3]):
             print('EE is not in safety area')
+            return True, False
+
+        if self._is_tower_collision():
+            print('Robot is about to collide with the tower')
             return True, False
 
         # TODO: ADD FORCE SAFETY CHECK
@@ -240,6 +271,7 @@ class RealDrawerEnv(Env):
 
         # Horizontal goal, vertical goal
         if self._ref_P_drawer is not None and self._ref_P_drawer.z >= self._target_position:
+            print('Terminated due to drawer being open')
             return True, True
 
         return False, False

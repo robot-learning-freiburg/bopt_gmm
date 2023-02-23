@@ -16,9 +16,9 @@ robot:
     - panda_finger_joint1
     - panda_finger_joint2
   initial_pose:
-    q: [-1.85, 0.23, 1.64, -2.40, 0.10, 2.80, 1.67]  # Starting point for IK and for frequent robot reset
+    q: [-0.023170335759713712, 0.25468064101938326, 0.06394754041494409, -2.195471185424787, 0.3998670844954465, 2.6669155128659616, 1.391240276259784]  # Starting point for IK and for frequent robot reset
     gripper_width: 0.05
     position:
-      min: [0.1, 0.05, 0.3]
-      max: [0.3, 0.2, 0.45]
+      min: [0.4, -0.1, 0.3]
+      max: [0.5,  0.1, 0.45]
   joint_reset_frequency: 5  # Return the robot to the original q pose every n steps
