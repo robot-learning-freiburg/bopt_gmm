@@ -3,7 +3,8 @@ import numpy as np
 
 from argparse    import ArgumentError
 from functools   import lru_cache
-from itertools   import cycle
+from itertools   import cycle, \
+                        product
 from pathlib     import Path
 from random      import random
 from scipy.stats import multivariate_normal
@@ -135,8 +136,8 @@ class GMM(object):
         for k, (c_g_mean, c_p_mean, c_g_cvar, c_pg_cvar) in enumerate(zip(self._mu(d_given), 
                                                                           self._mu(d_predicted), f_g_cvar, f_pg_cvar)):
             #     (pred, K)  (pred, given)  (given, given)               (num_x, given)
-            aux_1 = (x - c_g_mean).T
-            aux_2 = c_pg_cvar.dot(np.linalg.pinv(c_g_cvar)).dot(aux_1)
+            divergence = (x - c_g_mean).T
+            aux_2 = c_pg_cvar.dot(np.linalg.pinv(c_g_cvar)).dot(divergence)
             aux   = c_p_mean + aux_2.T
             p_mean += (aux.T * weights[k]).T
         return p_mean
@@ -196,7 +197,7 @@ class GMM(object):
         temp = np.vstack(np.tril_indices(self._cvar.shape[1]))
         return tuple(np.hstack([np.vstack(([i] * temp.shape[1], temp)) for i in range(self.n_priors)]))
 
-    def update_gaussian(self, priors=None, mu=None, sigma=None):
+    def update_gaussian(self, priors=None, mu=None, sigma=None, sigma_scale=None):
         """Returns a new GMM updated with the given deltas
 
         Args:
@@ -239,7 +240,87 @@ class GMM(object):
         else:
             new_sigma = self._cvar
         
+        if sigma_scale is not None:
+            new_sigma = new_sigma * sigma_scale
+
         return type(self)(new_priors, new_mu, new_sigma)
+
+    @lru_cache(1)
+    def semantic_inference_weights(self, dims):
+        """Returns the relative importance of the semantic dimensions 
+           for calculating the weighting of components given a sample.
+
+           Specifically:
+            out = {dim_0: [c_0_0, ..., c_0_k],
+                   ...
+                   dim_m: [c_m_0, ..., c_m_k]}
+            
+            where sum(c_0_i, ..., c_m_i) == 1
+        """
+        # (d, k) matrix of determinants
+        out = np.asarray([[np.linalg.det(i_sigma_d) for i_sigma_d in self._inv_sigma(self.semantic_dims()[d])] 
+                                                    for d in dims])
+
+        # Normalize
+        out /= out.sum(axis=0)
+        return out.T
+
+    @lru_cache(10)
+    def semantic_prediction_weights(self, p_dims, given_dims):
+        """Returns the relative importance of the semantic dimensions 
+           for calculating the action of components given a sample.
+
+           Specifically:
+            out = {dim_0: [c_0_0, ..., c_0_k],
+                   ...
+                   dim_m: [c_m_0, ..., c_m_k]}
+            
+            where sum(c_0_i, ..., c_m_i) == 1
+        """
+        out = {}
+        for p in p_dims:
+            try:
+                out[p] = np.abs(np.asarray([[1 / np.abs(sigma_dp).sum()
+                                             for sigma_dp in self._sigma(self.semantic_dims()[d], 
+                                                                        self.semantic_dims()[p])] 
+                                             for d in given_dims]))
+            except KeyError as e:
+                raise Exception(f'Unknown semantic dimension "{k}"')
+
+            # Normalize
+            out[p] /= out[p].sum(axis=0)
+            out[p] = out[p].T
+        return out
+
+    def calculate_reweighting_inference_update(self, target, dims):
+        """Given a desired target weight distribution, calculates 
+           an update scaling matrix to achieve this distribution."""
+        current_weights = self.semantic_inference_weights(dims)
+
+        update_factors = {k: t / c for k, t, c in zip(dims, target.T, current_weights.T)}
+
+        update_matrix  = np.ones_like(self._cvar)
+        for k, fs in update_factors.items():
+            k_dim  = self.semantic_dims()[k]
+            coords = list(zip(*product(k_dim, k_dim)))
+
+            for k, f in enumerate(fs):
+                update_matrix[k, coords[0], coords[1]] = f**(1/len(k_dim))  # Actual factor is the nth root
+        return update_matrix
+
+    def calculate_reweighting_prediction_update(self, target, dims_in):
+        """Given a desired target weight distribution, calculates 
+           an update scaling matrix to achieve this distribution."""
+        current_weights = self.semantic_prediction_weights(tuple(target.keys()), tuple(dims_in))
+
+        update_factors = {k: t / current_weights[k] for k, t in target.items()}
+
+        update_matrix  = np.ones_like(self._cvar)
+        for k, fs in update_factors.items():
+            k_dim = self.semantic_dims()[k]
+            for d, f in zip(dims_in, fs):
+                update_matrix[:, k_dim, self.semantic_dims()[d]] = f
+        return update_matrix
 
     @classmethod
     def load_model(cls, path):

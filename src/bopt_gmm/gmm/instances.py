@@ -1,5 +1,7 @@
 import numpy as np
 
+from collections import OrderedDict
+
 from functools import lru_cache
 from .gmm import GMM, add_gmm_model
 
@@ -37,9 +39,10 @@ class GMMCart3D(GMM):
     def prediction_dim(self):
         return (3, 4, 5)
 
+    @lru_cache(1)
     def semantic_dims(self):
-        return {'position': self.state_dim, 
-                'velocity': self.prediction_dim}
+        return OrderedDict([('position', self.state_dim), 
+                            ('velocity', self.prediction_dim)])
 
 add_gmm_model(GMMCart3D)
 
@@ -90,10 +93,14 @@ class GMMCart3DJS(GMM):
 
     @lru_cache(1)
     def semantic_dims(self):
-        out = {'position': self.state_dim,
-               'velocity': self.prediction_dim}
-        out.update({d: (x + len(self.state_dim) - len(self._dim_names),) for x, d in enumerate(self._dim_names)})
-        out.update({f'{d}_vel': (x + 2 * len(self.state_dim) - len(self._dim_names),) for x, d in enumerate(self._dim_names)})
+        out = OrderedDict([('position', self.state_dim),
+                           ('velocity', self.prediction_dim)])
+        for x, d in enumerate(self._dim_names):
+            out[d] = (x + len(self.state_dim) - len(self._dim_names),)
+        
+        for x, d in enumerate(self._dim_names):
+            out[f'{d}_vel'] = (x + 2 * len(self.state_dim) - len(self._dim_names),)
+
         return out
 
 add_gmm_model(GMMCart3DJS)
@@ -161,16 +168,17 @@ class GMMCart3DForce(GMM):
         d.update({'force_scale': self._force_scale})
         return d
 
-    def update_gaussian(self, priors=None, mu=None, sigma=None):
-        new_model = super().update_gaussian(priors, mu, sigma)
+    def update_gaussian(self, priors=None, mu=None, sigma=None, sigma_scale=None):
+        new_model = super().update_gaussian(priors, mu, sigma, sigma_scale)
         new_model._force_scale = self._force_scale
         return new_model
 
+    @lru_cache(1)
     def semantic_dims(self):
-        return {'position': self.state_dim[:3],
-                   'force': self.state_dim[3:], 
-                'velocity': self.prediction_dim[:3],
-                'force_vel': self.prediction_dim[3:]}
+        return OrderedDict([('position', self.state_dim[:3]),
+                            ('force', self.state_dim[3:]), 
+                            ('velocity', self.prediction_dim[:3]),
+                            ('force_vel', self.prediction_dim[3:])])
 
 add_gmm_model(GMMCart3DForce)
 
@@ -181,11 +189,12 @@ class GMMCart3DTorque(GMMCart3DForce):
             obs_dict = np.hstack((obs_dict['position'], obs_dict['torque']))
         return super().predict(obs_dict, dims)[:,:3] if not full else super().predict(obs_dict, dims)
 
+    @lru_cache(1)
     def semantic_dims(self):
-        return {'position': self.state_dim[:3],
-                  'torque': self.state_dim[3:], 
-                'velocity': self.prediction_dim[:3],
-              'torque_vel': self.prediction_dim[3:]}
+        return OrderedDict([('position', self.state_dim[:3]),
+                            ('torque', self.state_dim[3:]), 
+                            ('velocity', self.prediction_dim[:3]),
+                            ('torque_vel', self.prediction_dim[3:])])
 
 add_gmm_model(GMMCart3DTorque)
 
