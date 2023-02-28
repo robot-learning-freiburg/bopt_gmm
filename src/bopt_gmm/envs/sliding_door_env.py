@@ -34,7 +34,7 @@ class SlidingDoorEnv(Env):
         self.sim.init('gui' if show_gui else 'direct')
 
         self.dt        = 1 / cfg.action_frequency
-        self.workspace = AABB(Point3(0.2, -0.65, 0), 
+        self.workspace = AABB(Point3(0.2, -0.65, -0.1), 
                               Point3(0.85, 0.65, 0.8))
 
         self.robot = self.sim.load_urdf(cfg.robot.path, useFixedBase=True)

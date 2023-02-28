@@ -9,6 +9,9 @@ from datetime    import datetime
 from functools   import lru_cache
 from itertools   import product
 from skopt       import Optimizer
+from omegaconf   import ListConfig, \
+                        DictConfig
+
 
 from smac        import HyperparameterOptimizationFacade, \
                         BlackBoxFacade, \
@@ -59,6 +62,7 @@ class GMMOptAgent(object):
         self.base_model = gmm
         self.config     = config
         self.model      = gmm
+        self._e_cvar_params = None
 
     @property
     @lru_cache(1)
@@ -69,7 +73,11 @@ class GMMOptAgent(object):
         if self.config.mean_range != 0.0:
             cs.add_hyperparameters([Float(mp, (-self.config.mean_range, self.config.mean_range), default=0) for mp in self._mean_params.keys()])
         if self.config.sigma_range != 0.0:
-            cs.add_hyperparameters([Float(sp, (-self.config.sigma_range, self.config.sigma_range), default=0) for sp in self._cvar_params.keys()])
+            cvar_params = self._cvar_params
+            if self._e_cvar_params is not None:
+                cs.add_hyperparameters([Float(sp, (1 - self.config.sigma_range, 1 + self.config.sigma_range), default=1.0) for sp in sum(cvar_params.values(), [])])
+            else:
+                cs.add_hyperparameters([Float(sp, (-self.config.sigma_range, self.config.sigma_range), default=0) for sp in cvar_params.keys()])
         return cs
 
     @property
@@ -81,16 +89,26 @@ class GMMOptAgent(object):
     @lru_cache(1)
     def _mean_params(self):
         opt_dims = [d for d in self.config.opt_dims if '|' not in d] if self.config.opt_dims is not None else []
-        if len(opt_dims) > 0:
+        config_dims = self.config.opt_dims
+        if type(config_dims) in {DictConfig, dict}:
+            config_dims = config_dims['means']
+
+        if type(config_dims) in {list, tuple, ListConfig} and len(opt_dims) > 0:
             return dict(sum([sum([[(f'mean_{d}_{y}_{x}', (y, x)) for x in self.base_model.semantic_dims()[d]]
-                                                                 for d in self.config.opt_dims], []) 
+                                                                 for d in config_dims], []) 
                                                                  for y in range(self.base_model.n_priors)], []))
+        else:
+            pass
         return dict(sum([[(f'mean_{y}_{x}', (y, x)) for x in range(self.base_model.n_dims)] for y in range(self.base_model.n_priors)], []))
 
     @property
     @lru_cache(1)
     def _cvar_params(self):
-        if self.config.opt_dims is not None and len(self.config.opt_dims) > 0:
+        config_dims = self.config.opt_dims
+        if type(config_dims) in {DictConfig, dict}:
+            config_dims = config_dims['cvars']
+
+        if type(config_dims) in {list, tuple, ListConfig} and len(self.config.opt_dims) > 0:
             out = {}
             
             vars  = [d for d in self.config.opt_dims if '|' not in d]
@@ -110,57 +128,80 @@ class GMMOptAgent(object):
                 for d in range(self.base_model.n_priors):
                     out.update({f'cvar_{state}|{inf}_{d}_{y}_{x}': (d, y, x) for y, x in coords})
             return out
+        elif type(config_dims) in {dict, DictConfig}:
+            e_cvar_params = {k: [f'eu_{i}_{k}' for i in range(self.base_model.n_priors)] for k in config_dims['unary']} if config_dims['unary'] is not None else {}
+
+            if config_dims['nary'] is not None:
+                for k in config_dims['nary']:
+                    dims = max([len(self.base_model.semantic_dims()[d]) for d in k.split('|')]) if '|' in k else len(self.base_model.semantic_dims()[k])
+                    e_cvar_params[k] = sum([[f'e_{i}_{k}_{x}' for x in range(dims)] for i in range(self.base_model.n_priors)], [])
+            
+            if len(e_cvar_params) > 0:
+                self._e_cvar_params = e_cvar_params
+                return self._e_cvar_params
         return dict(sum([(f'cvar_{d}_{y}_{x}', (d, y, x)) for y, x in zip(*np.tril_indices(self.base_model.n_dims))], []))
 
     def update_model(self, parameter_update):
-        self.state.current_update = self.state.gp_optimizer.ask()
+        if type(parameter_update) == TrialInfo:
+            parameter_update = parameter_update.config
 
         start_idx = 0
         if self.config.prior_range != 0.0:
-            if type(self.state.current_update) != TrialInfo:
-                u_priors   = self.state.current_update[start_idx:self.base_model.n_priors]
+            if type(parameter_update) not in {dict, Configuration}:
+                u_priors   = parameter_update[start_idx:self.base_model.n_priors]
                 start_idx += self.base_model.n_priors
             else:
-                u_priors   = np.asarray([self.state.current_update.config[p] for p in self._weight_params])
+                u_priors   = np.asarray([parameter_update[p] for p in self._weight_params])
         else:
             u_priors = None
 
         if self.config.mean_range != 0.0:
             mu         = self.base_model.mu()
             mu_space   = mu.max(axis=0) - mu.min(axis=0)
-            if type(self.state.current_update) != TrialInfo:
-                u_mean     = np.asarray(self.state.current_update[start_idx:start_idx + mu.size]).reshape(mu.shape) * mu_space
+            if type(parameter_update) not in {dict, Configuration}:
+                u_mean     = np.asarray(parameter_update[start_idx:start_idx + mu.size]).reshape(mu.shape) * mu_space
                 start_idx += mu.size
             else:
                 u_mean = np.zeros(mu.shape)
                 for k, coords in self._mean_params.items():
-                    u_mean[coords] = self.state.current_update.config[k]
+                    u_mean[coords] = parameter_update[k]
                 u_mean *= mu_space
         else:
             u_mean = None
 
+        u_sigma_e = None
+        u_sigma   = None
         if self.config.sigma_range != 0.0:
-            sigma       = self.base_model.sigma()
-            sigma_space = sigma.max(axis=0) - sigma.min(axis=0)
-            unit_update = np.zeros_like(sigma)
-            if type(self.state.current_update) != TrialInfo:
-                unit_update[self._cvar_indices[0], 
-                            self._cvar_indices[1], 
-                            self._cvar_indices[2]] = self.state.current_update[start_idx:start_idx + len(self._cvar_indices) * len(self._cvar_indices[0])]
-                unit_update = np.transpose(unit_update, [0, 2, 1])
+            if self._e_cvar_params is None:
+                sigma       = self.base_model.sigma()
+                sigma_space = sigma.max(axis=0) - sigma.min(axis=0)
+                unit_update = np.zeros_like(sigma)
+                if type(parameter_update) not in {dict, Configuration}:
+                    unit_update[self._cvar_indices[0], 
+                                self._cvar_indices[1], 
+                                self._cvar_indices[2]] = parameter_update[start_idx:start_idx + len(self._cvar_indices) * len(self._cvar_indices[0])]
+                    unit_update = np.transpose(unit_update, [0, 2, 1])
+                else:
+                    for n, c in self._cvar_params.items():
+                        unit_update[c] = parameter_update[n]
+                
+                unit_update *= sigma_space
+
+                # Transpose to accomodate lower triangle indices
+                u_sigma = unit_update[self.base_model._cvar_tril_idx]
             else:
-                for n, c in self._cvar_params.items():
-                    unit_update[c] = self.state.current_update.config[n]
-            
-            unit_update *= sigma_space
+                u_sigma_e = {k: np.array([parameter_update[v] for v in p]).reshape((self.base_model.n_priors, 
+                                                                                    len(p) // self.base_model.n_priors))
+                                                              for k, p in self._e_cvar_params.items()}
 
-            # Transpose to accomodate lower triangle indices
-            u_sigma = unit_update[self.base_model._cvar_tril_idx]
-        else:
-            u_sigma = None
+        self.model = self.base_model.update_gaussian(u_priors, u_mean, u_sigma, sigma_eigen_update=u_sigma_e)
 
-        self.model = self.base_model.update_gaussian(u_priors, u_mean, u_sigma)
-    
+    def reset(self):
+        self.model = self.base_model
+
+    def predict(self, observation):
+        return self.model.predict(observation).flatten()
+
 
 class BOPTGMMAgentBase(GMMOptAgent):
     @dataclass
@@ -195,7 +236,7 @@ class BOPTGMMAgentBase(GMMOptAgent):
 
     def predict(self, observation):
         observation = self.state.obs_transform(observation)
-        return {'motion': self.model.predict(observation).flatten(), 'gripper': self.config.gripper_command}
+        return {'motion': super().predict(observation), 'gripper': self.config.gripper_command}
 
     def step(self, prior_obs, posterior_obs, action, reward, done):
         transition = (prior_obs, posterior_obs, action, reward, done)
@@ -248,7 +289,7 @@ class BOPTGMMAgentBase(GMMOptAgent):
         self.state.gp_optimizer = facade(self._scenario,
                                          lambda config, seed, budget : 0,
                                          overwrite=True)
-        print(f'Base Model:\nPriors: {self.base_model.pi()}\nMu: {self.base_model.mu()}')
+        # print(f'Base Model:\nPriors: {self.base_model.pi()}\nMu: {self.base_model.mu()}')
 
         self.update_model()
 
@@ -269,7 +310,8 @@ class BOPTGMMAgentBase(GMMOptAgent):
                 self.state.current_update = self.state.gp_optimizer.ask()
 
                 super().update_model(self.state.current_update)
-                print(f'Updated Model:\nPriors: {self.model.pi()}\nMu: {self.model.mu()}\nSigma-Delta: {u_sigma}')
+                u_sigma = self.model.sigma() - self.base_model.sigma()
+                # print(f'Updated Model:\nPriors: {self.model.pi()}\nMu: {self.model.mu()}\nSigma-Delta: {u_sigma}')
                 break
             except ValueError as e:
                 pass

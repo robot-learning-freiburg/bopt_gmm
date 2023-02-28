@@ -197,7 +197,7 @@ class GMM(object):
         temp = np.vstack(np.tril_indices(self._cvar.shape[1]))
         return tuple(np.hstack([np.vstack(([i] * temp.shape[1], temp)) for i in range(self.n_priors)]))
 
-    def update_gaussian(self, priors=None, mu=None, sigma=None, sigma_scale=None):
+    def update_gaussian(self, priors=None, mu=None, sigma=None, sigma_scale=None, sigma_eigen_update=None):
         """Returns a new GMM updated with the given deltas
 
         Args:
@@ -238,10 +238,45 @@ class GMM(object):
                 if not isPD(new_sigma[x]):
                     new_sigma[x] = nearestPD(new_sigma[x])
         else:
-            new_sigma = self._cvar
+            new_sigma = self._cvar.copy()
         
         if sigma_scale is not None:
             new_sigma = new_sigma * sigma_scale
+
+        if sigma_eigen_update is not None:
+            for k, update in sigma_eigen_update.items():
+                if '|' not in k:
+                    k_dim = self.semantic_dims()[k]
+                    if update.shape != (self.n_priors, len(k_dim)) and update.shape != (self.n_priors, 1):
+                        raise Exception(f'Expected sigma eigenval update for {k} to have shape {(self.n_priors, len(k_dim))}, or {(self.n_priors, 1)}, but got {update.shape}')
+
+                    coords = tuple(zip(*product(k_dim, k_dim)))
+
+                    for k, (u, sigma_k) in enumerate(zip(update, self.sigma(k_dim, k_dim))):
+                        w, v = np.linalg.eig(sigma_k)
+                        new_sigma_k = v.dot(np.diag(w * u)).dot(np.linalg.inv(v))
+
+                        new_sigma[k, coords[0], coords[1]] = new_sigma_k.flatten()
+                else:
+                    dim_in, dim_out = k.split('|')
+                    dim_in  = self.semantic_dims()[dim_in]
+                    dim_out = self.semantic_dims()[dim_out]
+
+                    if update.shape != (self.n_priors, len(dim_in)) and update.shape != (self.n_priors, 1):
+                        raise Exception(f'Expected sigma eigenval update for {k} to have shape {(self.n_priors, len(dim_in))}, or {(self.n_priors, 1)}, but got {update.shape}')
+
+                    if len(dim_in) != len(dim_out):
+                        raise NotImplementedError(f'Currently eigenvalue updates are only possible for square associations. Association {k} is non-square.')
+
+                    coords = tuple(zip(*product(dim_out, dim_in)))
+
+                    for k, (u, sigma_k) in enumerate(zip(update, self.sigma(dim_in, dim_out))):
+                        w, v = np.linalg.eig(sigma_k)
+                        new_sigma_k = v.dot(np.diag(w * u)).dot(np.linalg.inv(v))
+
+                        new_sigma[k, coords[0], coords[1]] = new_sigma_k.flatten()
+                        # Set the upper triangle part
+                        new_sigma[k, coords[1], coords[0]] = new_sigma_k.T.flatten()
 
         return type(self)(new_priors, new_mu, new_sigma)
 

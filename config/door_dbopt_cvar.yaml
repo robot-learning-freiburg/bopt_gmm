@@ -1,9 +1,13 @@
 defaults:
-  - sliding_door_scenario
+  - door_scenario
   - override bopt@bopt_agent: bopt_gmm_dbopt
 
 bopt_agent:
   base_accuracy: 0.65
+  mean_range:  0.0
+  sigma_range: 0.05
   opt_dims:
     means: null
-    cvars: null
+    cvars:
+      unary: null
+      nary:  null

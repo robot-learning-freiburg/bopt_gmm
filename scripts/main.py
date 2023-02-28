@@ -144,7 +144,7 @@ def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10,
 
     if opt_model_dir is not None:
         fields = env.config_space
-        fields += ['bopt_step', 'substep', 'steps', 'success']
+        fields += [BOPT_TIME_SCALE, 'substep', 'steps', 'success']
 
         # Fix location generation
         ic_logger = CSVLogger(f'{opt_model_dir}/../bopt_initial_conditions.csv', fields)
@@ -205,7 +205,7 @@ def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10,
             ep_acc.log_run(step + 1, ep_return, info['success'])
             if ic_logger is not None:
                 ic = info['initial_conditions']
-                ic.update({'bopt_step': bopt_step, 
+                ic.update({BOPT_TIME_SCALE: bopt_step, 
                            'substep': sub_ep_idx, 
                            'steps' : step + 1, 
                            'success': info['success']})
@@ -247,7 +247,7 @@ def bopt_regularized_training(env, agent, reg_data, regularizer,
 
     if opt_model_dir is not None:
         fields = env.config_space
-        fields += ['bopt_step', 'substep', 'steps', 'success']
+        fields += [BOPT_TIME_SCALE, 'substep', 'steps', 'success']
 
         # Fix location generation
         ic_logger = CSVLogger(f'{opt_model_dir}/../bopt_initial_conditions.csv', fields)
@@ -311,7 +311,7 @@ def bopt_regularized_training(env, agent, reg_data, regularizer,
             ep_acc.log_run(step + 1, ep_return, info['success'])
             if ic_logger is not None:
                 ic = info['initial_conditions']
-                ic.update({'bopt_step': agent.get_bopt_step(), 
+                ic.update({BOPT_TIME_SCALE: agent.get_bopt_step(), 
                            'substep'  : 1, 
                            'steps'    : step + 1, 
                            'success'  : info['success']})

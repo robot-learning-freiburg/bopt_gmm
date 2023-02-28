@@ -168,8 +168,8 @@ class GMMCart3DForce(GMM):
         d.update({'force_scale': self._force_scale})
         return d
 
-    def update_gaussian(self, priors=None, mu=None, sigma=None, sigma_scale=None):
-        new_model = super().update_gaussian(priors, mu, sigma, sigma_scale)
+    def update_gaussian(self, priors=None, mu=None, sigma=None, sigma_scale=None, sigma_eigen_update=None):
+        new_model = super().update_gaussian(priors, mu, sigma, sigma_scale, sigma_eigen_update)
         new_model._force_scale = self._force_scale
         return new_model
 
