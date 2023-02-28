@@ -1,35 +1,144 @@
+import numpy as np
+
 from bopt_gmm.bopt import GMMOptAgent
+from dataclasses   import dataclass
+from functools     import lru_cache
+from gym           import Env
+from gym.spaces    import Box
+from typing        import List
 
-from stable_baselines3.sac import MlpPolicy
+from bopt_gmm.bopt import BOPT_TIME_SCALE
 
 
-class SACGMMAgent(MlpPolicy):
-    def __init__(self, gmm, config, obs_space, gripper_command=0.0, **kwargs) -> None:
-        super().__init__(**kwargs)
-        self._gmm_agent = GMMOptAgent(gmm, config)
-        self.pseudo_bopt_step = 0
+def f_void(*args):
+    pass
+
+
+@dataclass
+class SACGMMEnvCallback:
+    on_episode_start = f_void
+    on_episode_end   = f_void
+    on_reset         = f_void
+    on_post_step     = f_void
+
+
+
+class SACGMMEnv(Env):
+    def __init__(self, env : Env, 
+                 gmm_agent : GMMOptAgent, 
+                 gripper_command, 
+                 sacgmm_config,
+                 obs_filter={'position', 'force'}, 
+                 cb : List[SACGMMEnvCallback] = None):
+        self.agent  = gmm_agent
+        self.env    = env
+        self.config = sacgmm_config
+        self._n_env_steps = 0
+        self._ep_count  = 0
+        self._sac_steps = 0
+        self._action_dims = None
+        self._obs_dims    = None
+        self._obs_filter  = obs_filter
         self._gripper_command = gripper_command
-        self._sac = MlpPolicy()
+        self._cb = cb if cb is not None else []
 
-    def forward(self, obs, deterministic=False):
-        pass
-
-    def predict(self, obs):
-        # if callable(self._force_norm):
-        #     obs = self._force_norm(obs)
-        # elif 'force' in obs:
-        #     obs['force'] = obs['force'] * self._force_norm
-        return {'motion': self._model.predict(obs).flatten(), 'gripper': self._gripper_command}
-
-    def step(self, *args):
-        pass
+    def add_callback(self, cb):
+        self._cb.append(cb)
     
-    def has_gp_stage(self):
-        return False
+    def remove_callback(self, cb):
+        self._cb.remove(cb)
 
-    def is_in_gp_stage(self):
-        return False
+    @property
+    @lru_cache(1)
+    def observation_space(self):
+        lb = []
+        ub = []
+        self._obs_dims = []
 
-    def get_bopt_step(self):
-        self.pseudo_bopt_step += 1
-        return self.pseudo_bopt_step
+        for k, bound in self.env.observation_space.items():
+            if k in self._obs_filter:
+                self._obs_dims.append(k)
+                lb.append(bound.low)
+                ub.append(bound.high)
+
+        return Box(low=np.hstack(lb),
+                   high=np.hstack(ub))
+
+    @property
+    @lru_cache(1)
+    def action_space(self):
+        lb = []
+        ub = []
+        self._action_dims = []
+
+        for k, bound in self.agent.config_space.items():
+            self._action_dims.append(k)
+            lb.append(bound.lower)
+            ub.append(bound.upper)
+
+        return Box(low=np.asarray(lb),
+                   high=np.asarray(ub))
+
+    def _convert_obs(self, obs_dict):
+        return np.hstack([obs_dict[d] for d in self._obs_dims])
+
+    def reset(self):
+        self.agent.reset()
+        obs = self.env.reset()
+        self._n_env_steps = 0
+        obs = self._convert_obs(obs)
+        
+        if self._cb is not None:
+            for cb in self._cb:
+                cb.on_reset(obs)
+        return obs
+
+    def step(self, action):
+        dict_update = dict(zip(self._action_dims, action))
+
+        if self._n_env_steps == 0:
+            for cb in self._cb:
+                cb.on_episode_start(self.env.config_dict, dict_update)
+
+        self.agent.update_model(dict_update)
+
+        obs = self.env.observation()
+
+        for x in range(self.config.sacgmm_steps):
+            action = self.agent.predict(obs)
+            action = {'motion': action.flatten(), 
+                      'gripper': self._gripper_command}
+            # print(observation)
+            obs, reward, done, info = self.env.step(action)
+            
+            if done:
+                break
+        
+        self._n_env_steps += x + 1
+        self._sac_steps   += 1
+        
+        for cb in self._cb:
+            cb.on_post_step(reward, self._n_env_steps)
+
+        done = done or self._n_env_steps >= self.config.episode_steps
+        
+        if done:
+            self._ep_count += 1
+
+            for cb in self._cb:
+                cb.on_episode_end(self.env, obs, self._n_env_steps, self._sac_steps)        
+
+        obs = self._convert_obs(obs)
+
+        return obs, reward, done, info
+
+    def eval_copy(self):
+        out = SACGMMEnv(self.env,  
+                        self.agent, 
+                        self._gripper_command, 
+                        self.config, 
+                        self._obs_filter)
+        # Generate internal variables
+        os  = out.observation_space
+        acs = out.action_space
+        return out
