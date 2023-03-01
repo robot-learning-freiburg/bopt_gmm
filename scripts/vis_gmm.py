@@ -59,8 +59,9 @@ def f_rot_trans(rot, pos):
     out[:3,  3] = pos
     return out
 
-def draw_gmm(vis : ROSVisualizer, namespace, gmm, dimensions=None):
-    dimensions = list(gmm.semantic_dims().keys())
+def draw_gmm(vis : ROSVisualizer, namespace, gmm, dimensions=None, frame=None):
+    dimensions = list(gmm.semantic_dims().keys()) if dimensions is None else dimensions
+
 
     for d in dimensions:
         if '|' in d:
@@ -73,16 +74,20 @@ def draw_gmm(vis : ROSVisualizer, namespace, gmm, dimensions=None):
                 w, v = np.linalg.eig(sigma_k)
                 print(f'{k}:\n{w}\n{v}\n{np.sqrt((v**2).sum(axis=0))}\nQ: {real_quat_from_matrix(v)} \n -------')
                 
-                vis.draw_ellipsoid(namespace, f_rot_trans(v, mu_k), w)
+                print(v.dot(w.reshape((len(w), 1))), w)
+
+                vis.draw_vector(f'{namespace}/inference', mu_k, ((v * np.sqrt(np.abs(w)) * np.sign(w)).sum(axis=1)).astype(float), width=0.01, frame=frame)
+                # vis.draw_vector(f'{namespace}/inference', mu_k, v[:, 0], width=0.01, frame=frame)
+                vis.draw_ellipsoid(f'{namespace}/inference', f_rot_trans(v, mu_k), np.sqrt(np.abs(w)), frame=frame)
         else:
-            dims = gmm.semantic_dims()[d]
+            dims  = gmm.semantic_dims()[d]
 
             for k, (mu_k, sigma_k) in enumerate(zip(gmm.mu(dims), gmm.sigma(dims, dims))):
                 print(sigma_k)
                 w, v = np.linalg.eig(sigma_k)
                 print(f'{k}:\n{w}\n{v}\n{np.sqrt((v**2).sum(axis=0))}\nQ: {real_quat_from_matrix(v)} \n -------')
                 
-                vis.draw_ellipsoid(namespace, f_rot_trans(v, mu_k), w)
+                vis.draw_ellipsoid(f'{namespace}/variance', f_rot_trans(v, mu_k), np.sqrt(np.abs(w)), frame=frame)
 
 
 if __name__ == '__main__':
@@ -107,10 +112,11 @@ if __name__ == '__main__':
     rospy.init_node('bopt_gmm_visualizer')
 
     vis = ROSVisualizer('vis')
+    rospy.sleep(0.3)
 
-    vis.begin_draw_cycle('gmms')
-    draw_gmm(vis, 'gmms', gmm, ['position'])
-    vis.render('gmms')
+    vis.begin_draw_cycle()
+    draw_gmm(vis, 'gmms', gmm, ['position', 'position|velocity'])
+    vis.render()
 
     # for _, _, _, t in trajs:
     #     gmm_traj = rollout(gmm, t[0, :gmm.n_dims // 2], args.steps, 1 / args.action_freq)
