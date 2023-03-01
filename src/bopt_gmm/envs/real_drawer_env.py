@@ -11,6 +11,7 @@ except ModuleNotFoundError: # Just don't load this if we don't have the panda li
     Panda = None
 
 from iai_bullet_sim import Point3,            \
+                           Vector3,           \
                            AABB
 
 from multiprocessing import RLock
@@ -21,7 +22,6 @@ from gym        import Env
 
 from .utils     import BoxSampler, \
                        NoiseSampler
-
 
 from geometry_msgs.msg import WrenchStamped as WrenchStampedMsg
 
@@ -38,6 +38,8 @@ class RealDrawerEnv(Env):
 
         self.tfBuffer = tf2_ros.Buffer()
         self.listener = tf2_ros.TransformListener(self.tfBuffer)
+
+        self.stiffness = [cfg.robot.stiffness.linear]*3 + [cfg.robot.stiffness.angular]*3
 
         self._robot   = Panda(cfg.robot.state_prefix, 
                               cfg.robot.controllers_prefix)
@@ -60,6 +62,12 @@ class RealDrawerEnv(Env):
 
         self.starting_position_sampler = BoxSampler(cfg.robot.initial_pose.position.min,
                                                     cfg.robot.initial_pose.position.max)
+
+        self.noise_samplers = {}
+
+        self.ref_P_v_goal = None
+
+        self.dt = 1 /30
 
         # self._init_pose = Transform(Point3(*robot_init_state.position), initial_rot)
         # self.robot.set_joint_positions(cfg.robot.initial_pose.q, override_initial=True)
@@ -93,11 +101,14 @@ class RealDrawerEnv(Env):
                     [f'ee_pose_{x}' for x in 'x,y,z,qx,qy,qz,qw'.split(',')]
 
     def config_dict(self):
-        raise NotImplementedError
-        out = {} 
+        out = {}
         for k, n in self.noise_samplers.items(): 
             out.update(dict(zip([f'{k}_noise_{x}' for x in 'xyz'], n.sample())))
-        out.update(dict(zip([f'ee_pose_{x}' for x in 'x,y,z,qx,qy,qz,qw'.split(',')], self.eef.pose.array())))
+        robot_P_ee = self._robot.state.O_T_EE[:3, 3].flatten()
+        robot_R_ee = sm.UnitQuaternion(self._robot.state.O_T_EE[:3, :3])
+        out.update(dict(zip([f'ee_pose_{x}' for x in 'x,y,z'.split(',')], robot_P_ee)))
+        out.update(dict(zip([f'ee_pose_{x}' for x in 'qx,qy,qz'.split(',')], robot_R_ee.v)))
+        out['ee_pose_qw'] = robot_R_ee.s
         return out
 
     @property
@@ -192,8 +203,15 @@ class RealDrawerEnv(Env):
         print('Bla5')
         self._robot.move_joint_position(q_start, vel_scale=0.15)
 
+        self.ref_P_v_goal = self._robot.state.O_T_EE[:3, 3].flatten()
+
+        self._robot.cm.activate_controller(self._robot.CART_IMPEDANCE_CONTROLLER)
+        self._robot.cm.set_cartesian_stiffness(self.stiffness)
+
         print('Bla6')
         self._elapsed_steps = 0
+        
+        self._n_reset +=1
 
         return self.observation()
 
@@ -202,12 +220,34 @@ class RealDrawerEnv(Env):
             raise Exception(f'Action needs to be a dict with the fields "motion" and "gripper"')
 
         action_motion = action['motion'] / max(np.abs(action['motion']).max(), 1)
+
+
+        self.ref_P_v_goal += action_motion * self.dt
+
+        ref_T_ee  = self._ref_T_robot * self._robot.state.O_T_EE
+        ref_P_ee_pos = ref_T_ee[:3, 3].flatten()
+        
+        ee_vp_delta = Point3(*self.ref_P_v_goal) - Point3(*ref_P_ee_pos)
+
+        if ee_vp_delta.norm() > 0.05:
+            self.ref_P_v_goal = ref_P_ee_pos + ee_vp_delta.normalized() * 0.05
+
+        ref_T_ee_goal = np.array(sm.SE3.Rt(ref_T_ee[:3, :3], self.ref_P_v_goal, check=False))
+
+        print(ref_T_ee_goal)
+
+        robot_T_ee_goal = self._robot_T_ref * ref_T_ee_goal
+
+        print(f'Action: {action}\nCurrent EE: {self._robot.state.O_T_EE}\nGoal EE: {robot_T_ee_goal}')
+        
+        self._robot.async_move_ee_cart_absolute(robot_T_ee_goal)
+
         # self.controller.act(action_motion * self.dt)
 
         # if 'gripper' in action:
         #     self._set_gripper_absolute_goal(np.clip(action['gripper'], 0, 1))
 
-        rospy.sleep(1 / 30)
+        rospy.sleep(self.dt)
 
         obs = self.observation()
         done, success = self.is_terminated()
