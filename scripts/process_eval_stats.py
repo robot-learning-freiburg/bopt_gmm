@@ -34,7 +34,10 @@ if __name__ == '__main__':
     
     summary = []
 
-    r_pattern = r'(_(\d+))?(_f|)_(\d)_(([a-z]+_)+|)n(\d\d)_([a-z]+)_(\d+)_(\d+)_([a-z]+)_([a-z]+)'
+    # _, training Steps, force, components, optim groups, _ noise, _, prior range, mean range, surrogate, optimizer
+    r_pattern1 = r'(_(\d+))?(_f|)_(\d)_(([a-z]+_)+|)n(\d\d)_([a-z]+)_(\d+)_(\d+)_([a-z]+)_([a-z]+)'
+    # _, training Steps, force, components, optim groups, _ noise, _, prior range, mean range, cvar range, optimizer
+    r_pattern2 = r'(_(\d+))?(_f|)_(\d)_(([a-z]+_)+|)n(\d\d)_(\d+)_(\d+)_(\d+)_([a-z]+)'
 
     for d in tqdm(args.dirs, desc='Processing directories'):
         pattern = f'{d}/eval_*_ic.csv'
@@ -55,10 +58,14 @@ if __name__ == '__main__':
                 continue
 
             try:
-                _, train_steps, force, components, optim_groups, _, noise, _, prior, m, _, func = regex.findall(r_pattern, str(Path(p).parent.name))[0]
+                _, train_steps, force, components, optim_groups, _, noise, _, prior, m, _, func = regex.findall(r_pattern1, str(Path(p).parent.name))[0]
+                cvar = 0
             except (ValueError, IndexError) as e:
-                print(f'{p}\n{str(Path(p).parent.name)}\n{regex.findall(pattern, str(Path(p).parent.name))}:\n{e}')
-                exit(0)
+                try:
+                    _, train_steps, force, components, optim_groups, _, noise, prior, m, cvar, func = regex.findall(r_pattern2, str(Path(p).parent.name))[0]
+                except (ValueError, IndexError) as e:
+                    print(f'{p}\n{str(Path(p).parent.name)}\n{regex.findall(pattern, str(Path(p).parent.name))}:\n{e}')
+                    exit(0)
 
             train_steps  = int(train_steps) if train_steps != '' else ''
             force        = False if force == '' else True
@@ -67,7 +74,7 @@ if __name__ == '__main__':
             noise        = int(noise) * 0.01
             prior        = int(prior) * 0.01
             m            = int(m) * 0.01
-            s            = 0.0
+            cvar         = int(cvar) * 0.01
 
             # noise_vectors = np.vstack((df.position_noise_x.array, 
             #                            df.position_noise_y.array,
@@ -78,12 +85,12 @@ if __name__ == '__main__':
             base  = f'{p.parent}/models/gmm_base.npy'
 
             if args.base_models is None:
-                summary.append([p, components, noise, force, train_steps, ' '.join(optim_groups), prior, m, s, eval_num, df.success.mean(), model, base])
+                summary.append([p, components, noise, force, train_steps, ' '.join(optim_groups), prior, m, cvar, eval_num, df.success.mean(), model, base])
             else:
                 if components not in base_models:
                     print(f'No base model provided for {components} in {args.base_models}')
                     exit(-1)
-                summary.append([p, components, noise, force, train_steps, ' '.join(optim_groups), prior, m, s, eval_num, df.success.mean(), model, base, base_models[components]])
+                summary.append([p, components, noise, force, train_steps, ' '.join(optim_groups), prior, m, cvar, eval_num, df.success.mean(), model, base, base_models[components]])
 
     
     pd.DataFrame(summary, columns=header).to_csv(args.out, index=False)
