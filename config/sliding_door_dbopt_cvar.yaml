@@ -9,5 +9,6 @@ bopt_agent:
   opt_dims:
     means: null
     cvars:
+      type: rotation
       unary: null
       nary:  null

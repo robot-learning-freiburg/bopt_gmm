@@ -63,6 +63,7 @@ class GMMOptAgent(object):
         self.config     = config
         self.model      = gmm
         self._e_cvar_params = None
+        self._complex_update_type = 'eigen'
 
     @property
     @lru_cache(1)
@@ -75,7 +76,10 @@ class GMMOptAgent(object):
         if self.config.sigma_range != 0.0:
             cvar_params = self._cvar_params
             if self._e_cvar_params is not None:
-                cs.add_hyperparameters([Float(sp, (1 - self.config.sigma_range, 1 + self.config.sigma_range), default=1.0) for sp in sum(cvar_params.values(), [])])
+                if self._complex_update_type == 'eigen':
+                    cs.add_hyperparameters([Float(sp, (1 - self.config.sigma_range, 1 + self.config.sigma_range), default=1.0) for sp in sum(cvar_params.values(), [])])
+                else:
+                    cs.add_hyperparameters([Float(sp, (-self.config.sigma_range, self.config.sigma_range), default=0.0) for sp in sum(cvar_params.values(), [])])
             else:
                 cs.add_hyperparameters([Float(sp, (-self.config.sigma_range, self.config.sigma_range), default=0) for sp in cvar_params.keys()])
         return cs
@@ -129,6 +133,8 @@ class GMMOptAgent(object):
                     out.update({f'cvar_{state}|{inf}_{d}_{y}_{x}': (d, y, x) for y, x in coords})
             return out
         elif type(config_dims) in {dict, DictConfig}:
+            self._complex_update_type = config_dims['type'] if 'type' in config_dims else 'eigen'
+
             e_cvar_params = {k: [f'eu_{i}_{k}' for i in range(self.base_model.n_priors)] for k in config_dims['unary']} if config_dims['unary'] is not None else {}
 
             if config_dims['nary'] is not None:
@@ -165,7 +171,7 @@ class GMMOptAgent(object):
                 u_mean = np.zeros(mu.shape)
                 for k, coords in self._mean_params.items():
                     u_mean[coords] = parameter_update[k]
-                u_mean *= mu_space
+                # u_mean *= mu_space
         else:
             u_mean = None
 
@@ -193,8 +199,10 @@ class GMMOptAgent(object):
                 u_sigma_e = {k: np.array([parameter_update[v] for v in p]).reshape((self.base_model.n_priors, 
                                                                                     len(p) // self.base_model.n_priors))
                                                               for k, p in self._e_cvar_params.items()}
-
-        self.model = self.base_model.update_gaussian(u_priors, u_mean, u_sigma, sigma_eigen_update=u_sigma_e)
+        if self._complex_update_type == 'eigen':
+            self.model = self.base_model.update_gaussian(u_priors, u_mean, u_sigma, sigma_eigen_update=u_sigma_e)
+        else:
+            self.model = self.base_model.update_gaussian(u_priors, u_mean, u_sigma, sigma_rotation=u_sigma_e)
 
     def reset(self):
         self.model = self.base_model

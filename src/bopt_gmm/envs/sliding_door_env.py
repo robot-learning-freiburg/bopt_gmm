@@ -208,8 +208,12 @@ class SlidingDoorEnv(Env):
     def door_position(self):
         return self.frame.pose.inv().dot(self.door.pose).position.y
 
+    @property
+    def reference_frame(self):
+        return self.reference_link.pose
+
     def observation(self):
-        out = {'position'      : (self.eef.pose.position - self.reference_link.pose.position).numpy(),
+        out = {'position'      : self.reference_frame.inv().dot(self.eef.pose.position).numpy(),
                'gripper_width' : sum(self.robot.joint_state[j.name].position for j in self.gripper_joints),
                'force'         : self.eef_ft_sensor.get().linear.numpy(),
                'torque'        : self.eef_ft_sensor.get().angular.numpy(),

@@ -13,6 +13,11 @@ class GMMCart3D(GMM):
             obs_dict = obs_dict['position']
         return super().predict(obs_dict, dims)
 
+    def get_weights(self, obs, dims=None):
+        if type(obs) == dict:
+            obs = obs['position']
+        return super().get_weights(obs, dims)
+
     def mu_pos(self):
         return self.mu([0, 1, 2])
 
@@ -58,6 +63,11 @@ class GMMCart3DJS(GMM):
             obs_dict = np.hstack([obs_dict[x] for x in ['position'] + self._dim_names])
 
         return super().predict(obs_dict, dims)[:,:3] if not full else super().predict(obs_dict, dims)
+
+    def get_weights(self, obs, dims=None):
+        if type(obs) == dict:
+            obs = np.hstack([obs[x] for x in ['position'] + self._dim_names])
+        return super().get_weights(obs, dims)
 
     def mu_pos(self):
         return self.mu([0, 1, 2])
@@ -118,6 +128,11 @@ class GMMCart3DForce(GMM):
             obs_dict = np.hstack((obs_dict['position'], obs_dict['force']))
         scale = np.isin(dims, self.GIVEN[-3:], invert=True) + np.isin(dims, self.GIVEN[-3:]).astype(float) * self._force_scale
         return super().predict(obs_dict * scale, dims)[:,:3] if not full else super().predict(obs_dict * scale, dims)
+
+    def get_weights(self, obs, dims=None):
+        if type(obs) == dict:
+            obs = np.hstack((obs['position'], obs['force']))
+        return super().get_weights(obs, dims)
 
     def mu_pos(self):
         return self.mu([0, 1, 2])
@@ -188,6 +203,11 @@ class GMMCart3DTorque(GMMCart3DForce):
         if type(obs_dict) == dict:
             obs_dict = np.hstack((obs_dict['position'], obs_dict['torque']))
         return super().predict(obs_dict, dims)[:,:3] if not full else super().predict(obs_dict, dims)
+
+    def get_weights(self, obs, dims=None):
+        if type(obs) == dict:
+            obs = np.hstack((obs['position'], obs['torque']))
+        return super().get_weights(obs, dims)
 
     @lru_cache(1)
     def semantic_dims(self):
