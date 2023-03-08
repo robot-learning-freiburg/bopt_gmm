@@ -49,6 +49,10 @@ class GMMCart3D(GMM):
         return OrderedDict([('position', self.state_dim), 
                             ('velocity', self.prediction_dim)])
 
+    @lru_cache(1)
+    def semantic_obs_dims(self):
+        return OrderedDict([('position', self.state_dim[:3])])
+
 add_gmm_model(GMMCart3D)
 
 class GMMCart3DJS(GMM):
@@ -113,13 +117,20 @@ class GMMCart3DJS(GMM):
 
         return out
 
+    @lru_cache(1)
+    def semantic_obs_dims(self):
+        out = OrderedDict([('position', self.state_dim[:3])])
+        for x, d in enumerate(self._dim_names):
+            out[d] = (x + len(self.state_dim) - len(self._dim_names),)
+        return out
+
 add_gmm_model(GMMCart3DJS)
 
 
 class GMMCart3DForce(GMM):
     GIVEN = (0, 1, 2, 3, 4, 5)
 
-    def __init__(self, priors, means, cvar, force_scale=1.0):
+    def __init__(self, priors, means=12, cvar=None, force_scale=1.0):
         super().__init__(priors, means, cvar)
         self._force_scale = force_scale
 
@@ -132,7 +143,8 @@ class GMMCart3DForce(GMM):
     def get_weights(self, obs, dims=None):
         if type(obs) == dict:
             obs = np.hstack((obs['position'], obs['force']))
-        return super().get_weights(obs, dims)
+        scale = np.isin(dims, self.GIVEN[-3:], invert=True) + np.isin(dims, self.GIVEN[-3:]).astype(float) * self._force_scale
+        return super().get_weights(obs * scale, dims)
 
     def mu_pos(self):
         return self.mu([0, 1, 2])
@@ -183,8 +195,8 @@ class GMMCart3DForce(GMM):
         d.update({'force_scale': self._force_scale})
         return d
 
-    def update_gaussian(self, priors=None, mu=None, sigma=None, sigma_scale=None, sigma_eigen_update=None):
-        new_model = super().update_gaussian(priors, mu, sigma, sigma_scale, sigma_eigen_update)
+    def update_gaussian(self, priors=None, mu=None, sigma=None, sigma_scale=None, sigma_eigen_update=None, sigma_rotation=None):
+        new_model = super().update_gaussian(priors, mu, sigma, sigma_scale, sigma_eigen_update, sigma_rotation=sigma_rotation)
         new_model._force_scale = self._force_scale
         return new_model
 
@@ -194,6 +206,11 @@ class GMMCart3DForce(GMM):
                             ('force', self.state_dim[3:]), 
                             ('velocity', self.prediction_dim[:3]),
                             ('force_vel', self.prediction_dim[3:])])
+    
+    @lru_cache(1)
+    def semantic_obs_dims(self):
+        return OrderedDict([('position', self.state_dim[:3]),
+                            ('force', self.state_dim[3:])])
 
 add_gmm_model(GMMCart3DForce)
 
@@ -202,12 +219,14 @@ class GMMCart3DTorque(GMMCart3DForce):
     def predict(self, obs_dict, dims=GMMCart3DForce.GIVEN, full=False):
         if type(obs_dict) == dict:
             obs_dict = np.hstack((obs_dict['position'], obs_dict['torque']))
-        return super().predict(obs_dict, dims)[:,:3] if not full else super().predict(obs_dict, dims)
+        scale = np.isin(dims, self.GIVEN[-3:], invert=True) + np.isin(dims, self.GIVEN[-3:]).astype(float) * self._force_scale
+        return super().predict(obs_dict * scale, dims)[:,:3] if not full else super().predict(obs_dict * scale, dims)
 
     def get_weights(self, obs, dims=None):
         if type(obs) == dict:
             obs = np.hstack((obs['position'], obs['torque']))
-        return super().get_weights(obs, dims)
+        scale = np.isin(dims, self.GIVEN[-3:], invert=True) + np.isin(dims, self.GIVEN[-3:]).astype(float) * self._force_scale
+        return super().get_weights(obs * scale, dims)
 
     @lru_cache(1)
     def semantic_dims(self):

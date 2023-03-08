@@ -79,7 +79,8 @@ class GMMOptAgent(object):
                 if self._complex_update_type == 'eigen':
                     cs.add_hyperparameters([Float(sp, (1 - self.config.sigma_range, 1 + self.config.sigma_range), default=1.0) for sp in sum(cvar_params.values(), [])])
                 else:
-                    cs.add_hyperparameters([Float(sp, (-self.config.sigma_range, self.config.sigma_range), default=0.0) for sp in sum(cvar_params.values(), [])])
+                    cs.add_hyperparameters([Float(sp, (-self.config.sigma_range, self.config.sigma_range), default=0.0) if '|' in sp else 
+                                            Float(sp, (1 - self.config.sigma_range, 1 + self.config.sigma_range), default=1.0) for sp in sum(cvar_params.values(), [])])
             else:
                 cs.add_hyperparameters([Float(sp, (-self.config.sigma_range, self.config.sigma_range), default=0) for sp in cvar_params.keys()])
         return cs

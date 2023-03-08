@@ -290,9 +290,9 @@ class GMM(object):
                     coords = tuple(zip(*product(k_dim, k_dim)))
 
                     for k, (u, sigma_k) in enumerate(zip(update, self.sigma(k_dim, k_dim))):
-                        rot  = Quaternion.from_euler(*u).matrix()
+                        w, v = np.linalg.eig(sigma_k)
+                        new_sigma_k = v.dot(np.diag(w * u)).dot(np.linalg.inv(v))
 
-                        new_sigma_k = rot.dot(sigma_k)
                         new_sigma[k, coords[0], coords[1]] = new_sigma_k.flatten()
                 else:
                     dim_in, dim_out = k.split('|')
