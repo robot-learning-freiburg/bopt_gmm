@@ -1,5 +1,6 @@
 from .gmm import GMM, \
-                 add_gmm_model
+                 add_gmm_model, \
+                 gen_prior_gmm
 
 from .instances import GMMCart3D,       \
                        GMMCart3DJS,     \

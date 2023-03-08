@@ -7,7 +7,7 @@ from bopt_gmm.gmm   import GMM
 from bopt_gmm.utils import unpack_transition_traj, \
                            calculate_trajectory_velocities
 
-def gmm_fit_em(n_components, points, gmm_type=GMM, max_iter=100, tol=0.01, n_init=1, model_kwargs={}):
+def gmm_fit_em(n_components, points, gmm_type=GMM, max_iter=100, tol=0.01, n_init=1, prior_gmm=None, model_kwargs={}):
     """EM-Algorithm for fitting a GMM to data
 
     Args:
@@ -15,11 +15,28 @@ def gmm_fit_em(n_components, points, gmm_type=GMM, max_iter=100, tol=0.01, n_ini
         points (np.ndarray): Data to fit to. (points, dim)
     """
 
+    prior_weights = None if prior_gmm is None else prior_gmm.pi()
+    prior_means   = None if prior_gmm is None else prior_gmm.mu()
+    prior_cvars   = None if prior_gmm is None else prior_gmm.sigma()
+
     bgmm = BayesianGaussianMixture(n_components=n_components,
                                    max_iter=max_iter,
                                    random_state=np.random.RandomState(0),
                                    tol=tol,
-                                   n_init=n_init).fit(points)
+                                   n_init=n_init if prior_gmm is None else 1,
+                                   warm_start=prior_gmm is not None)
+    if prior_gmm is not None:
+        bgmm.weights_ = prior_gmm.pi()
+        bgmm.means_   = prior_gmm.mu()
+        bgmm.covariances_ = prior_gmm.sigma()
+        bgmm.converged_ = True
+        bgmm.lower_bound_ = -np.inf
+        bgmm._check_parameters(points)
+        # bgmm.degrees_of_freedom_prior_ = prior_means.shape[1]
+        bgmm._estimate_weights(bgmm.weights_)
+        bgmm._estimate_means(bgmm.weights_, bgmm.means_)
+        bgmm._estimate_precisions(bgmm.weights_, bgmm.means_, bgmm.covariances_)
+    bgmm.fit(points)
 
     # means = points[np.random.choice(points.shape[0], n_components)]
     # gmm   = GMM(n_components, means)

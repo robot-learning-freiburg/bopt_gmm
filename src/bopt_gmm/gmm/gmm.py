@@ -511,4 +511,33 @@ class GMM(object):
     def semantic_dims(self):
         raise NotImplementedError
 
+    def semantic_obs_dims(self):
+        raise NotImplementedError
+
 add_gmm_model(GMM)
+
+
+def gen_prior_gmm(new_type, gmm, model_kwargs={}):
+    prior_gmm = new_type(gmm.pi(), **model_kwargs)
+
+    for d, i in gmm.semantic_dims().items():
+        if d in prior_gmm.semantic_dims():
+            # Assign means
+            coords_base = list(zip(*product(range(gmm.n_priors), i)))
+            coords_new  = list(zip(*product(range(gmm.n_priors), prior_gmm.semantic_dims()[d])))
+            prior_gmm._means[coords_new[0], coords_new[1]] = gmm._means[coords_base[0], coords_base[1]]
+
+            # Copy variances and covariances
+            for d2, i2 in gmm.semantic_dims().items():
+                if d2 in prior_gmm.semantic_dims():
+                    coords_base = list(zip(*product(range(gmm.n_priors), i2, i)))
+                    coords_new  = list(zip(*product(range(gmm.n_priors), 
+                                                    prior_gmm.semantic_dims()[d2],
+                                                    prior_gmm.semantic_dims()[d])))
+                    prior_gmm._cvar[coords_new[0], 
+                                    coords_new[1], 
+                                    coords_new[2]] = gmm._cvar[coords_base[0],
+                                                               coords_base[1], 
+                                                               coords_base[2]]
+            
+    return prior_gmm

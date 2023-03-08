@@ -1,0 +1,10 @@
+<launch>
+    <node name="parameter_gui" pkg="joint_state_publisher_gui" type="joint_state_publisher_gui">
+        <remap from="/joint_states" to="/gmm_updates"/>
+        <remap from="/robot_description" to="/gmm_description"/>
+    </node>
+
+    <rosparam command="load" file="$(find bopt_gmm)/robots/panda_hand.urdf" param="/robot_description"/>
+
+    <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" output="screen"/>
+</launch>

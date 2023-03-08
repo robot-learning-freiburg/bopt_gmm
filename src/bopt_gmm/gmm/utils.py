@@ -165,11 +165,16 @@ def draw_gmm(vis, namespace, gmm, dimensions=None, visual_scaling=1.0, frame=Non
 def draw_gmm_stats(vis, namespace, gmm, observation, frame=None):
     activations = gmm.get_weights(observation, gmm.state_dim)
     
+    if activations.sum() == 0:
+        print(f'Zero activation {activations.sum()}')
+        return
+
     activations = np.nan_to_num(activations / activations.sum()).flatten()
 
     vis.begin_draw_cycle(f'{namespace}/stats')
-    for a, mu_k in zip(activations, gmm.mu(gmm.semantic_dims()['position'])):
-        vis.draw_vector(f'{namespace}/stats', mu_k, (0, 0, a), frame=frame)
+    for mu_k in [gmm.mu(v) for k, v in gmm.semantic_obs_dims().items() if len(v) == 3]:
+        for k, a in enumerate(activations):
+            vis.draw_vector(f'{namespace}/stats', mu_k[k], (0, 0, a), frame=frame)
     
     vis.render(f'{namespace}/stats')
 

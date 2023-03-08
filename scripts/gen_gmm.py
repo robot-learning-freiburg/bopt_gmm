@@ -1,6 +1,6 @@
 import numpy as np
 import os
-import bopt_gmm.gmm as gmm
+import bopt_gmm.gmm as libgmm
 
 
 from argparse import ArgumentParser
@@ -16,9 +16,9 @@ from bopt_gmm.utils import unpack_trajectories, \
                            calculate_trajectory_velocities, \
                            normalize_trajectories
 
-MODEL_MAP = {'position' : gmm.GMMCart3D,
-             '_'.join(sorted(['position', 'force']))  : gmm.GMMCart3DForce,
-             '_'.join(sorted(['position', 'torque'])) : gmm.GMMCart3DTorque}
+MODEL_MAP = {'position' : libgmm.GMMCart3D,
+             '_'.join(sorted(['position', 'force']))  : libgmm.GMMCart3DForce,
+             '_'.join(sorted(['position', 'torque'])) : libgmm.GMMCart3DTorque}
 
 if __name__ == '__main__':
     parser = ArgumentParser(description='Generate GMMs from trajectory data')
@@ -33,6 +33,7 @@ if __name__ == '__main__':
     parser.add_argument('--action-freq', default=30,     type=float, help='Action frequency.')
     parser.add_argument('--normalize',   action='store_true',        help='Normalize additional modalities to the space of positions.')
     parser.add_argument('--modalities',  default=['position'], nargs='+', help='Modalities on which to train GMM')
+    parser.add_argument('--prior',       default=None, help='Prior GMM to use for initializing optimizer.')
     args = parser.parse_args()
 
     if args.generator == 'seds':
@@ -61,12 +62,12 @@ if __name__ == '__main__':
     try:
         gmm_type = MODEL_MAP['_'.join(sorted(args.modalities))]
         if group_norms is not None:
-            if gmm_type == gmm.GMMCart3DForce:
+            if gmm_type == libgmm.GMMCart3DForce:
                 model_kwargs = {'force_scale': group_norms['force']}
-            elif gmm_type == gmm.GMMCart3DTorque:
+            elif gmm_type == libgmm.GMMCart3DTorque:
                 model_kwargs = {'force_scale': group_norms['torque']}
     except KeyError:
-        gmm_type = gmm.GMMCart3DJS
+        gmm_type = libgmm.GMMCart3DJS
         model_kwargs = {'dim_names' : sorted([m for m in args.modalities if m != 'position'])}
 
 
@@ -89,12 +90,18 @@ if __name__ == '__main__':
                              args.tol_cutting, args.max_iter, 
                              gmm_type=gmm_type, model_kwargs=model_kwargs)
     elif args.generator == 'em':
+        if args.prior is not None:
+            prior_gmm = libgmm.gen_prior_gmm(gmm_type, libgmm.GMM.load_model(args.prior), model_kwargs=model_kwargs)
+        else:
+            prior_gmm = None
+
         data = np.vstack([calculate_trajectory_velocities(t, dt) for t in trajs])
         gmm  = gmm_fit_em(args.n_priors, data, 
                           max_iter=args.max_iter, 
                           tol=args.tol_cutting, 
                           n_init=args.n_init,
                           gmm_type=gmm_type,
+                          prior_gmm=prior_gmm,
                           model_kwargs=model_kwargs)
 
     gmm.save_model(args.out)

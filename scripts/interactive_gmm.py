@@ -2,7 +2,7 @@ import hydra
 import numpy as np
 import rospy
 import tf2_ros
-import json
+import yaml
 
 from argparse        import ArgumentParser
 from dataclasses     import dataclass
@@ -10,7 +10,9 @@ from multiprocessing import RLock
 from roebots         import ROSVisualizer
 
 from sensor_msgs.msg   import JointState       as JointStateMsg
-from geometry_msgs.msg import TransformStamped as TransformStampedMsg
+from std_msgs.msg      import String           as StringMsg
+from geometry_msgs.msg import TransformStamped as TransformStampedMsg, \
+                              WrenchStamped    as WrenchStampedMsg
 
 from bopt_gmm.envs   import ENV_TYPES
 from bopt_gmm.gmm    import GMM, \
@@ -70,10 +72,14 @@ if __name__ == '__main__':
 
                 gmm_utils.draw_gmm(app_state.visualizer, 'gmm', agent.model, opt_dims, 1e-1)
 
+    def cb_save(msg : StringMsg):
+        with open(f'{msg.data}_n{int(cfg.env.noise.position.variance * 100):02d}_{int(app_state.successes / app_state.runs * 100):03d}.yaml', 'w') as f:
+            yaml.dump(app_state.last_update, f)
 
-
+    sub_save = rospy.Subscriber('/save_params', StringMsg, callback=cb_save, queue_size=1, tcp_nodelay=True)
     sub = rospy.Subscriber('/gmm_updates', JointStateMsg, callback=cb_js, queue_size=1, tcp_nodelay=True)    
     pub = rospy.Publisher('/joint_states', JointStateMsg, queue_size=1, tcp_nodelay=True)    
+    pub_wrench = rospy.Publisher('/wrist_wrench', WrenchStampedMsg, tcp_nodelay=True, queue_size=1)
 
     env = ENV_TYPES[cfg.env.type](cfg.env, show_gui=True)
 
@@ -83,7 +89,11 @@ if __name__ == '__main__':
     ref_msg  = TransformStampedMsg()
     ref_msg.header.frame_id = 'panda_link0'
     ref_msg.child_frame_id  = 'gmm_reference'
+    
+    wrench_msg = WrenchStampedMsg()
+    wrench_msg.header.frame_id = env.robot.joints[cfg.env.robot.ft_joint].link._name
 
+    env_steps = 0
     while not rospy.is_shutdown():
         frame_start = rospy.Time.now()
         
@@ -96,6 +106,7 @@ if __name__ == '__main__':
 
         
         obs, reward, done, info = env.step(action)
+        env_steps += 1
 
         # Publish robot state for visualization in RVIZ
         js_msg = JointStateMsg()
@@ -105,6 +116,11 @@ if __name__ == '__main__':
 
         pub.publish(js_msg)
     
+        wrench_msg.header.stamp = js_msg.header.stamp
+        wrench_msg.wrench.force.x, wrench_msg.wrench.force.y, wrench_msg.wrench.force.z    = obs['force']
+        wrench_msg.wrench.torque.x, wrench_msg.wrench.torque.y, wrench_msg.wrench.torque.z = obs['torque']
+        pub_wrench.publish(wrench_msg)
+
         ref_pose = env.reference_frame
         ref_msg.transform.translation.x, \
         ref_msg.transform.translation.y, \
@@ -120,11 +136,12 @@ if __name__ == '__main__':
 
         # print(env.observation()
         # print(f'Is terminated: {terminated}\nIs success: {success}')
-        if done:
+        if done or env_steps > cfg.bopt_agent.num_episode_steps:
             if info['success']:
                 app_state.successes += 1
             app_state.runs += 1
             obs = env.reset()
+            env_steps = 0
 
             print(f'Accuracy since last parameter update: {app_state.successes / app_state.runs} ({app_state.successes}/{app_state.runs})')
         
