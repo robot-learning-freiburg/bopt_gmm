@@ -49,16 +49,16 @@ from bopt_gmm.envs import PegEnv,   \
                           ENV_TYPES
 
 
-def gen_force_logger_and_hook():
+def gen_force_logger_and_hook(force_scale=1.0):
     create_dpg_context()
     live_plot = LivePlot('Forces', {'force_x': 'Force X', 
                                     'force_y': 'Force Y',
                                     'force_z': 'Force Z'})
     
     def live_plot_hook(step, env, agent, obs, *args):
-        live_plot.add_value('force_x', obs['force'][0])
-        live_plot.add_value('force_y', obs['force'][1])
-        live_plot.add_value('force_z', obs['force'][2])
+        live_plot.add_value('force_x', obs['force'][0] * force_scale)
+        live_plot.add_value('force_y', obs['force'][1] * force_scale)
+        live_plot.add_value('force_z', obs['force'][2] * force_scale)
         render_dpg_frame()
 
     return live_plot, live_plot_hook
@@ -73,7 +73,8 @@ def evaluate_agent(env, agent, num_episodes=100, max_steps=600,
     successful_episodes = 0
 
     if show_forces:
-        live_plot, live_plot_hook = gen_force_logger_and_hook()
+        force_scale = agent.model._force_scale if hasattr(agent.model, '_force_scale') else 1.0
+        live_plot, live_plot_hook = gen_force_logger_and_hook(force_scale)
     else:
         live_plot_hook = None
 

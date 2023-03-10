@@ -24,7 +24,7 @@ class RunAccumulator:
 
 class AgentWrapper(object):
     def __init__(self, model, gripper_command=0.0) -> None:
-        self._model = model
+        self.model = model
         self.pseudo_bopt_step = 0
         self._gripper_command = gripper_command
 
@@ -33,7 +33,7 @@ class AgentWrapper(object):
         #     obs = self._force_norm(obs)
         # elif 'force' in obs:
         #     obs['force'] = obs['force'] * self._force_norm
-        return {'motion': self._model.predict(obs).flatten(), 'gripper': self._gripper_command}
+        return {'motion': self.model.predict(obs).flatten(), 'gripper': self._gripper_command}
 
     def step(self, *args):
         pass
