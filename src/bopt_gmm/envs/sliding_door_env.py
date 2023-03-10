@@ -83,8 +83,8 @@ class SlidingDoorEnv(Env):
 
         # print(f'Original: {temp_eef_pose}\nResolved EEF state: {self.eef.pose}\nDesired: {self._init_pose}\nPeg pos: {peg_position}')
 
-        # self.controller     = CartesianRelativePointCOrientationController(self.robot, self.eef)
-        self.controller     = CartesianRelativeVPointCOrientationController(self.robot, self.eef, 0.02)
+        self.controller     = CartesianRelativePointCOrientationController(self.robot, self.eef)
+        # self.controller     = CartesianRelativeVPointCOrientationController(self.robot, self.eef, 0.02)
 
         self.render_camera  = PerspectiveCamera(self.sim, self.render_size[:2], 
                                                 50, 0.1, 10.0, 
@@ -213,10 +213,12 @@ class SlidingDoorEnv(Env):
         return self.reference_link.pose
 
     def observation(self):
-        out = {'position'      : self.reference_frame.inv().dot(self.eef.pose.position).numpy(),
+        ft_in_w = self.eef_ft_sensor.get_world_space()
+        ref_T_w = self.reference_frame.inv()
+        out = {'position'      : ref_T_w.dot(self.eef.pose.position).numpy(),
                'gripper_width' : sum(self.robot.joint_state[j.name].position for j in self.gripper_joints),
-               'force'         : self.eef_ft_sensor.get().linear.numpy(),
-               'torque'        : self.eef_ft_sensor.get().angular.numpy(),
+               'force'         : ref_T_w.dot(ft_in_w.linear).numpy(),
+               'torque'        : ref_T_w.dot(ft_in_w.angular).numpy(),
                'doorpos'       : self.door_position
                }
         for k in out:
