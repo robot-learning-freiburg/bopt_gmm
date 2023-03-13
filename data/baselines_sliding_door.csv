@@ -1,45 +1,59 @@
-model                       ,env          ,noise ,accuracy ,date
-models/gmm/sd_3p.npy        ,sliding_door , 0.0  ,    0.32 ,2023-03-10 18:50:49.580244
-models/gmm/sd_3p/n00_f.npy  ,sliding_door , 0.0  ,    0.0  ,2023-03-10 18:59:00.015042
-models/gmm/sd_3p/n00_js.npy ,sliding_door , 0.0  ,    0.14 ,2023-03-10 19:07:51.814208
-models/gmm/sd_3p.npy        ,sliding_door , 0.01 ,    0.35 ,2023-03-10 18:51:22.545015
-models/gmm/sd_3p/n01_f.npy  ,sliding_door , 0.01 ,    0.0  ,2023-03-10 18:58:36.174009
-models/gmm/sd_3p/n01_js.npy ,sliding_door , 0.01 ,    0.1  ,2023-03-10 19:08:05.608142
-models/gmm/sd_3p.npy        ,sliding_door , 0.02 ,    0.26 ,2023-03-10 18:51:10.988071
-models/gmm/sd_3p/n02_f.npy  ,sliding_door , 0.02 ,    0.0  ,2023-03-10 19:00:13.905170
-models/gmm/sd_3p/n02_js.npy ,sliding_door , 0.02 ,    0.08 ,2023-03-10 19:08:23.346548
-models/gmm/sd_3p.npy        ,sliding_door , 0.03 ,    0.19 ,2023-03-10 18:51:25.907973
-models/gmm/sd_3p/n03_f.npy  ,sliding_door , 0.03 ,    0.0  ,2023-03-10 18:59:10.663242
-models/gmm/sd_3p/n03_js.npy ,sliding_door , 0.03 ,    0.17 ,2023-03-10 19:08:57.822634
-models/gmm/sd_3p.npy        ,sliding_door , 0.05 ,    0.09 ,2023-03-10 18:51:23.141612
-models/gmm/sd_3p/n05_f.npy  ,sliding_door , 0.05 ,    0.0  ,2023-03-10 18:59:30.630785
-models/gmm/sd_3p/n05_js.npy ,sliding_door , 0.05 ,    0.21 ,2023-03-10 19:09:46.148243
-models/gmm/sd_5p.npy        ,sliding_door , 0.0  ,    0.37 ,2023-03-10 18:49:39.663154
-models/gmm/sd_5p/n00_f.npy  ,sliding_door , 0.0  ,    0.0  ,2023-03-10 18:54:29.199855
-models/gmm/sd_5p/n00_js.npy ,sliding_door , 0.0  ,    0.13 ,2023-03-10 19:04:48.606773
-models/gmm/sd_5p.npy        ,sliding_door , 0.01 ,    0.3  ,2023-03-10 18:50:07.729743
-models/gmm/sd_5p/n01_f.npy  ,sliding_door , 0.01 ,    0.0  ,2023-03-10 18:56:46.110946
-models/gmm/sd_5p/n01_js.npy ,sliding_door , 0.01 ,    0.13 ,2023-03-10 19:05:22.389829
-models/gmm/sd_5p.npy        ,sliding_door , 0.02 ,    0.26 ,2023-03-10 18:50:12.565233
-models/gmm/sd_5p/n02_f.npy  ,sliding_door , 0.02 ,    0.0  ,2023-03-10 18:57:59.727920
-models/gmm/sd_5p/n02_js.npy ,sliding_door , 0.02 ,    0.17 ,2023-03-10 19:04:46.650900
-models/gmm/sd_5p.npy        ,sliding_door , 0.03 ,    0.28 ,2023-03-10 18:50:13.021181
-models/gmm/sd_5p/n03_f.npy  ,sliding_door , 0.03 ,    0.0  ,2023-03-10 18:57:58.847979
-models/gmm/sd_5p/n03_js.npy ,sliding_door , 0.03 ,    0.12 ,2023-03-10 19:06:01.693009
-models/gmm/sd_5p.npy        ,sliding_door , 0.05 ,    0.17 ,2023-03-10 18:50:06.041687
-models/gmm/sd_5p/n05_f.npy  ,sliding_door , 0.05 ,    0.0  ,2023-03-10 18:57:43.496072
-models/gmm/sd_5p/n05_js.npy ,sliding_door , 0.05 ,    0.01 ,2023-03-10 19:07:15.188325
-models/gmm/sd_7p.npy        ,sliding_door , 0.0  ,    0.45 ,2023-03-10 18:48:46.743709
-models/gmm/sd_7p/n00_f.npy  ,sliding_door , 0.0  ,    0.0  ,2023-03-10 18:54:48.948152
-models/gmm/sd_7p/n00_js.npy ,sliding_door , 0.0  ,    0.16 ,2023-03-10 19:01:58.512330
-models/gmm/sd_7p.npy        ,sliding_door , 0.01 ,    0.39 ,2023-03-10 18:48:29.695586
-models/gmm/sd_7p/n01_js.npy ,sliding_door , 0.01 ,    0.15 ,2023-03-10 19:03:20.288737
-models/gmm/sd_7p.npy        ,sliding_door , 0.02 ,    0.3  ,2023-03-10 18:48:51.526298
-models/gmm/sd_7p/n02_f.npy  ,sliding_door , 0.02 ,    0.0  ,2023-03-10 18:54:26.770147
-models/gmm/sd_7p/n02_js.npy ,sliding_door , 0.02 ,    0.15 ,2023-03-10 19:01:55.953805
-models/gmm/sd_7p.npy        ,sliding_door , 0.03 ,    0.25 ,2023-03-10 18:48:51.479104
-models/gmm/sd_7p/n03_f.npy  ,sliding_door , 0.03 ,    0.0  ,2023-03-10 18:53:10.523000
-models/gmm/sd_7p/n03_js.npy ,sliding_door , 0.03 ,    0.25 ,2023-03-10 19:01:57.971921
-models/gmm/sd_7p.npy        ,sliding_door , 0.05 ,    0.17 ,2023-03-10 18:48:36.794743
-models/gmm/sd_7p/n05_f.npy  ,sliding_door , 0.05 ,    0.0  ,2023-03-10 18:55:22.365495
-models/gmm/sd_7p/n05_js.npy ,sliding_door , 0.05 ,    0.13 ,2023-03-10 19:05:01.277872
+model,env,noise,accuracy,date
+models/gmm/sd_3p_f.npy,sliding_door,0.0,0.0,2023-03-13 15:17:50.779735
+models/gmm/sd_3p_f.npy,sliding_door,0.01,0.0,2023-03-13 15:17:32.940559
+models/gmm/sd_3p_f.npy,sliding_door,0.02,0.0,2023-03-13 15:17:57.518325
+models/gmm/sd_3p_f.npy,sliding_door,0.03,0.01,2023-03-13 15:19:23.307661
+models/gmm/sd_3p_f.npy,sliding_door,0.05,0.0,2023-03-13 15:20:50.863521
+models/gmm/sd_3p.npy,sliding_door,0.0,0.07,2023-03-13 14:41:17.248059
+models/gmm/sd_3p/n00_f.npy,sliding_door,0.0,0.0,2023-03-10 18:59:00.015042
+models/gmm/sd_3p/n00_js.npy,sliding_door,0.0,0.14,2023-03-10 19:07:51.814208
+models/gmm/sd_3p.npy,sliding_door,0.01,0.13,2023-03-13 14:41:34.085390
+models/gmm/sd_3p/n01_f.npy,sliding_door,0.01,0.0,2023-03-10 18:58:36.174009
+models/gmm/sd_3p/n01_js.npy,sliding_door,0.01,0.1,2023-03-10 19:08:05.608142
+models/gmm/sd_3p.npy,sliding_door,0.02,0.08,2023-03-13 14:41:35.769114
+models/gmm/sd_3p/n02_f.npy,sliding_door,0.02,0.0,2023-03-10 19:00:13.905170
+models/gmm/sd_3p/n02_js.npy,sliding_door,0.02,0.08,2023-03-10 19:08:23.346548
+models/gmm/sd_3p.npy,sliding_door,0.03,0.07,2023-03-13 14:42:04.450086
+models/gmm/sd_3p/n03_f.npy,sliding_door,0.03,0.0,2023-03-10 18:59:10.663242
+models/gmm/sd_3p/n03_js.npy,sliding_door,0.03,0.17,2023-03-10 19:08:57.822634
+models/gmm/sd_3p.npy,sliding_door,0.05,0.04,2023-03-13 14:42:57.048507
+models/gmm/sd_3p/n05_f.npy,sliding_door,0.05,0.0,2023-03-10 18:59:30.630785
+models/gmm/sd_3p/n05_js.npy,sliding_door,0.05,0.21,2023-03-10 19:09:46.148243
+models/gmm/sd_5p.npy,sliding_door,0.0,0.2,2023-03-13 14:37:14.205852
+models/gmm/sd_5p/n00_f.npy,sliding_door,0.0,0.0,2023-03-10 18:54:29.199855
+models/gmm/sd_5p/n00_js.npy,sliding_door,0.0,0.13,2023-03-10 19:04:48.606773
+models/gmm/sd_5p.npy,sliding_door,0.01,0.18,2023-03-13 14:38:30.025189
+models/gmm/sd_5p/n01_f.npy,sliding_door,0.01,0.0,2023-03-10 18:56:46.110946
+models/gmm/sd_5p/n01_js.npy,sliding_door,0.01,0.13,2023-03-10 19:05:22.389829
+models/gmm/sd_5p.npy,sliding_door,0.02,0.2,2023-03-13 14:37:55.399384
+models/gmm/sd_5p/n02_f.npy,sliding_door,0.02,0.0,2023-03-10 18:57:59.727920
+models/gmm/sd_5p/n02_js.npy,sliding_door,0.02,0.17,2023-03-10 19:04:46.650900
+models/gmm/sd_5p.npy,sliding_door,0.03,0.09,2023-03-13 14:38:51.251527
+models/gmm/sd_5p/n03_f.npy,sliding_door,0.03,0.0,2023-03-10 18:57:58.847979
+models/gmm/sd_5p/n03_js.npy,sliding_door,0.03,0.12,2023-03-10 19:06:01.693009
+models/gmm/sd_5p.npy,sliding_door,0.05,0.07,2023-03-13 14:39:32.671385
+models/gmm/sd_5p/n05_f.npy,sliding_door,0.05,0.0,2023-03-10 18:57:43.496072
+models/gmm/sd_5p/n05_js.npy,sliding_door,0.05,0.01,2023-03-10 19:07:15.188325
+models/gmm/sd_7p_f.npy,sliding_door,0.0,0.0,2023-03-13 15:22:14.761570
+models/gmm/sd_7p_f.npy,sliding_door,0.01,0.0,2023-03-13 14:46:48.645556
+models/gmm/sd_7p_f.npy,sliding_door,0.02,0.0,2023-03-13 14:46:24.890490
+models/gmm/sd_7p_f.npy,sliding_door,0.03,0.0,2023-03-13 14:47:01.425990
+models/gmm/sd_7p_f.npy,sliding_door,0.05,0.0,2023-03-13 14:47:45.105129
+models/gmm/sd_7p.npy,sliding_door,0.0,0.27,2023-03-13 14:33:36.985454
+models/gmm/sd_7p/n00_f.npy,sliding_door,0.0,0.0,2023-03-10 18:54:48.948152
+models/gmm/sd_7p/n00_js.npy,sliding_door,0.0,0.16,2023-03-10 19:01:58.512330
+models/gmm/sd_7p.npy,sliding_door,0.01,0.22,2023-03-13 14:34:50.391546
+models/gmm/sd_7p/n01_js.npy,sliding_door,0.01,0.15,2023-03-10 19:03:20.288737
+models/gmm/sd_7p.npy,sliding_door,0.02,0.19,2023-03-13 14:33:41.126834
+models/gmm/sd_7p/n02_f.npy,sliding_door,0.02,0.0,2023-03-10 18:54:26.770147
+models/gmm/sd_7p/n02_js.npy,sliding_door,0.02,0.15,2023-03-10 19:01:55.953805
+models/gmm/sd_7p.npy,sliding_door,0.03,0.19,2023-03-13 14:35:01.635849
+models/gmm/sd_7p/n03_f.npy,sliding_door,0.03,0.0,2023-03-10 18:53:10.523000
+models/gmm/sd_7p/n03_js.npy,sliding_door,0.03,0.25,2023-03-10 19:01:57.971921
+models/gmm/sd_7p.npy,sliding_door,0.05,0.11,2023-03-13 14:33:10.495704
+models/gmm/sd_7p/n05_f.npy,sliding_door,0.05,0.0,2023-03-10 18:55:22.365495
+models/gmm/sd_7p/n05_js.npy,sliding_door,0.05,0.13,2023-03-10 19:05:01.277872
+models/gmm/sd_7p_t.npy,sliding_door,0.01,0.0,2023-03-13 15:23:42.473210
+models/gmm/sd_7p_t.npy,sliding_door,0.02,0.0,2023-03-13 15:23:33.035475
+models/gmm/sd_7p_t.npy,sliding_door,0.03,0.0,2023-03-13 15:25:03.561701
+models/gmm/sd_7p_t.npy,sliding_door,0.05,0.0,2023-03-13 15:26:00.241499

@@ -83,8 +83,8 @@ class SlidingDoorEnv(Env):
 
         # print(f'Original: {temp_eef_pose}\nResolved EEF state: {self.eef.pose}\nDesired: {self._init_pose}\nPeg pos: {peg_position}')
 
-        self.controller     = CartesianRelativePointCOrientationController(self.robot, self.eef)
-        # self.controller     = CartesianRelativeVPointCOrientationController(self.robot, self.eef, 0.02)
+        # self.controller     = CartesianRelativePointCOrientationController(self.robot, self.eef)
+        self.controller     = CartesianRelativeVPointCOrientationController(self.robot, self.eef, 0.02)
 
         self.render_camera  = PerspectiveCamera(self.sim, self.render_size[:2], 
                                                 50, 0.1, 10.0, 
@@ -139,48 +139,51 @@ class SlidingDoorEnv(Env):
         return self.render_camera.rgb()
 
     def reset(self):
-        if self.visualizer is not None:
-            dbg_pos, dbg_dist, dbg_pitch, dbg_yaw = self.visualizer.get_camera_position()
+        # Initial state sampling is not stable
+        while True:
+            if self.visualizer is not None:
+                dbg_pos, dbg_dist, dbg_pitch, dbg_yaw = self.visualizer.get_camera_position()
 
-            dbg_rel_pos = dbg_pos - self.frame.pose.position
+                dbg_rel_pos = dbg_pos - self.frame.pose.position
 
-        for v in self.noise_samplers.values():
-            v.reset()
+            for v in self.noise_samplers.values():
+                v.reset()
 
-        self.sim.reset()
+            self.sim.reset()
 
-        position_sample = self.board_sampler.sample()
-        door_position  = Point3(*position_sample[:3])
-        self.frame.pose = Transform(door_position, Quaternion.from_euler(0, np.deg2rad(0), position_sample[-1]))
+            position_sample = self.board_sampler.sample()
+            door_position   = Point3(*position_sample[:3])
+            self.frame.pose = Transform(door_position, Quaternion.from_euler(0, np.deg2rad(0), position_sample[-1]))
 
-        self.door.pose = self.frame.pose.dot(Transform.from_xyz_rpy(0, -0.15, 0, 0, 0, np.deg2rad(180)))
+            self.door.pose = self.frame.pose.dot(Transform.from_xyz_rpy(0, -0.15, 0, 0, 0, np.deg2rad(180)))
 
-        if self.visualizer is not None:
-            self.visualizer.set_camera_position(self.frame.pose.position + dbg_rel_pos, dbg_dist, dbg_pitch, dbg_yaw)
+            if self.visualizer is not None:
+                self.visualizer.set_camera_position(self.frame.pose.position + dbg_rel_pos, dbg_dist, dbg_pitch, dbg_yaw)
 
-        x_goal = Transform(Point3(*self._robot_position_sampler.sample()), self.eef.pose.quaternion)
-        # Only used to restore PID state after reset
-        reset_controller = CartesianController(self.robot, self.eef)
+            x_goal = Transform(Point3(*self._robot_position_sampler.sample()), self.eef.pose.quaternion)
+            # Only used to restore PID state after reset
+            reset_controller = CartesianController(self.robot, self.eef)
 
-        # Let the robot drop a bit
-        for _ in range(5):
-            reset_controller.act(x_goal)
-            self._set_gripper_absolute_goal(0.5)
-            self.sim.update()
+            # Let the robot drop a bit
+            for _ in range(5):
+                reset_controller.act(x_goal)
+                self._set_gripper_absolute_goal(0.5)
+                self.sim.update()
 
-        # Wait for PID to restore the initial position
-        reset_steps = 0
-        while (np.abs(reset_controller.delta) >= [1e-2, 0.1]).max():
-            # print(f'EE: {self.eef.pose}\nDesired: {x_goal}\nDelta: {np.abs(reset_controller.delta).max()}')
-            reset_controller.act(x_goal)
-            self._set_gripper_absolute_goal(0.5)
-            self.sim.update()
-            if reset_steps > 1000:
-                print('Initial sample seems to have been bad. Resetting again.')
-                return self.reset()
-            reset_steps += 1
-
-        self.controller.reset()
+            # Wait for PID to restore the initial position
+            reset_steps = 0
+            while (np.abs(reset_controller.delta) >= [1e-2, 0.1]).max():
+                # print(f'EE: {self.eef.pose}\nDesired: {x_goal}\nDelta: {np.abs(reset_controller.delta).max()}')
+                reset_controller.act(x_goal)
+                self._set_gripper_absolute_goal(0.5)
+                self.sim.update()
+                if reset_steps > 1000:
+                    print('Initial sample seems to have been bad. Resetting again.')
+                    break
+                reset_steps += 1
+            else:
+                self.controller.reset()
+                break
 
         self._elapsed_steps = 0
 

@@ -70,6 +70,9 @@ class GMM(object):
         inv_cov = self._inv_sigma(dims)[component]
         det_cov = self._sigma_det(dims, dims)[component]
 
+        if det_cov < 0:
+            return 0
+
         delta = (X - mean)
 
         return np.exp(-0.5 * (delta * inv_cov.dot(delta.T).T).sum(axis=1)) / np.sqrt(((2 * np.pi) ** n_features) * det_cov)

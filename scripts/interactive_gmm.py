@@ -49,6 +49,8 @@ if __name__ == '__main__':
     gmm   = GMM.load_model(cfg.bopt_agent.gmm.model)
     agent = GMMOptAgent(gmm, cfg.bopt_agent)
 
+    print(f'Activations: {gmm._priors}')
+
     parameter_description = '<robot name="gmm">\n{}\n</robot>'.format('\n'.join([
         f'<joint name="{n}" type="prismatic">\n   <limit lower="{v.lower}" upper="{v.upper}"/>\n</joint>' for n, v in sorted(agent.config_space.items())
     ]))
