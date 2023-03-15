@@ -2,7 +2,7 @@ import numpy as np
 
 from scipy.stats import multivariate_normal
 
-USE_SKLEARN = False
+USE_SKLEARN = True
 
 if USE_SKLEARN:
     from sklearn.mixture import BayesianGaussianMixture
@@ -32,7 +32,8 @@ def gmm_fit_em(n_components, points, gmm_type=GMM, max_iter=100, tol=0.01, n_ini
                                        max_iter=max_iter,
                                        random_state=np.random.RandomState(0),
                                        tol=tol,
-                                       n_init=n_init if prior_gmm is None else 1)
+                                       n_init=n_init if prior_gmm is None else 1,
+                                       reg_covar=1e-3)
         bgmm.fit(points)
         return gmm_type(bgmm.weights_, bgmm.means_, bgmm.covariances_, **model_kwargs)
     else:
