@@ -232,9 +232,7 @@ class BOPTGMMAgentBase(GMMOptAgent):
 
 
     def __init__(self, base_gmm, config: BOPTAgentConfig, obs_transform = no_op, logger : LoggerBase=None) -> None:
-        self.base_model = base_gmm
-        self.config     = config
-        self.model      = base_gmm
+        super().__init__(base_gmm, config)
         self.logger     = logger
 
         self.state = BOPTGMMAgentBase.State(obs_transform=obs_transform)
