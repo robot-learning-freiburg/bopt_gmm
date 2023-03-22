@@ -23,7 +23,7 @@ def add_gmm_model(cls, name=None):
 
 
 class GMM(object):
-    def __init__(self, priors: Union[int, np.array]=None, means: Union[int, np.array]=None, cvar: np.array=None):
+    def __init__(self, priors: Union[int, np.array]=None, means: Union[int, np.array]=None, cvar: np.array=None, general_scale=1.0):
         # 1D - Simply the priors
         n_components = priors if type(priors) == int else len(priors)
         if type(priors) == int:
@@ -54,6 +54,7 @@ class GMM(object):
         else:
             self._cvar = cvar
         
+        self._general_scale = general_scale
         self._GMM_TYPE = str(type(self))
 
     @property
@@ -125,6 +126,8 @@ class GMM(object):
         """
         x = x if x.ndim == 2 else x.reshape((1, x.size))
 
+        x = x * self._general_scale
+
         if len(d_given) != x.shape[1]:
             raise Exception(f'Data with {x.shape[1]} dimensions was given, '
                             f'but {len(d_given)} dimensions were specified.')
@@ -145,10 +148,13 @@ class GMM(object):
             aux_2 = c_pg_cvar.dot(np.linalg.pinv(c_g_cvar)).dot(divergence)
             aux   = c_p_mean + aux_2.T
             p_mean += (aux.T * weights[k]).T
-        return p_mean
+
+        return p_mean / self._general_scale
 
     def conditional_pdf(self, X : np.array, d_given, *Ys : np.array):
         X = X if X.ndim == 2 else x.reshape((1, X.size))
+
+        X = X * self._general_scale
 
         if len(d_given) != X.shape[1]:
             raise Exception(f'Data with {X.shape[1]} dimensions was given, '
@@ -250,8 +256,8 @@ class GMM(object):
 
         if sigma_eigen_update is not None:
             for k, update in sigma_eigen_update.items():
-                if '|' not in k:
-                    k_dim = self.semantic_dims()[k]
+                if '|' not in k or k == 'STATE':
+                    k_dim = self.semantic_dims()[k] if k != 'STATE' else self.state_dim
                     if update.shape != (self.n_priors, len(k_dim)) and update.shape != (self.n_priors, 1):
                         raise Exception(f'Expected sigma eigenval update for {k} to have shape {(self.n_priors, len(k_dim))}, or {(self.n_priors, 1)}, but got {update.shape}')
 
@@ -264,8 +270,8 @@ class GMM(object):
                         new_sigma[k, coords[0], coords[1]] = new_sigma_k.flatten()
                 else:
                     dim_in, dim_out = k.split('|')
-                    dim_in  = self.semantic_dims()[dim_in]
-                    dim_out = self.semantic_dims()[dim_out]
+                    dim_in  = self.semantic_dims()[dim_in]  if dim_in != 'STATE'  else self.state_dim
+                    dim_out = self.semantic_dims()[dim_out] if dim_in != 'ACTION' else self.prediction_dim
 
                     if update.shape != (self.n_priors, len(dim_in)) and update.shape != (self.n_priors, 1):
                         raise Exception(f'Expected sigma eigenval update for {k} to have shape {(self.n_priors, len(dim_in))}, or {(self.n_priors, 1)}, but got {update.shape}')
@@ -405,6 +411,7 @@ class GMM(object):
             priors = model["priors"].squeeze()
             mu     = model["mu"]
             sigma  = model["sigma"]
+            gen_scale = model["scale"] if "scale" in model else 1.0
             
             if 'type' in model:
                 typ = GMM_MODEL_REGISTRY[model["type"]]
@@ -415,13 +422,14 @@ class GMM(object):
             # Compatibility with older models
             mu     = mu.T    if len(priors) == mu.shape[1]     else mu
             sigma  = sigma.T if len(priors) == sigma.shape[-1] else sigma
-            return typ(priors, mu, sigma, **custom_data)
+            return typ(priors, mu, sigma, general_scale=gen_scale, **custom_data)
         raise Exception(f'Path "{path}" does not exist')
 
     def save_model(self, path):
         np.save(path, {'priors': self._priors,  # num_gaussians
                        'mu'    : self._means,  # observation_size * 2, num_gaussians
                        'sigma' : self._cvar,
+                       'scale' : self._general_scale,
                        'type'  : self._GMM_TYPE,
                        'custom_data': self._custom_data()})
 
@@ -440,7 +448,7 @@ class GMM(object):
         new_sigma = np.concatenate((np.concatenate((self._cvar, cv_var_mat.transpose((0, 2, 1))), 1), 
                                     np.concatenate((cv_var_mat, new_dim_sigma), 1)), 2)
 
-        return type(self)(self._priors, new_mu, new_sigma)
+        return type(self)(self._priors, new_mu, new_sigma, general_scale=self._general_scale)
 
     @lru_cache(10)
     def _mu(self, dims=None):

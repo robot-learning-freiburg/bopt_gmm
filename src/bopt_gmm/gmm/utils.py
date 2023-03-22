@@ -130,22 +130,22 @@ def draw_gmm(vis, namespace, gmm, dimensions=None, visual_scaling=1.0, frame=Non
                 w, v = np.linalg.eig(gmm._cvar[k])
                 # sigma_inv = np.linalg.inv(sigma_io)
 
-                mat = sigma_io.dot(np.linalg.pinv(sigma_ii))
+                mat = sigma_io.dot(np.linalg.pinv(sigma_ii)) / gmm._general_scale
 
                 # pose = np.eye(4)
                 # pose[:3, :3] = v.astype(float) #  (v * w).astype(float) * visual_scaling
                 # pose[:3,  3] = mu_k
                 # poses.append(pose)
 
-                print(v, w)
-                print(v[:, 0].T.dot(v[:, 0]), 
-                      v[:, 0].T.dot(v[:, 1]),
-                      v[:, 0].T.dot(v[:, 2]),)
+                # print(v, w)
+                # print(v[:, 0].T.dot(v[:, 0]), 
+                #       v[:, 0].T.dot(v[:, 1]),
+                #       v[:, 0].T.dot(v[:, 2]),)
 
-                vis.draw_text(f'{namespace}/labels', mu_k_in, f'{d} {k}', height=0.04)
-                vis.draw_vector(f'{namespace}/inference', mu_k_in, (mat.T[0][:3] + mu_k_out) * visual_scaling, r=1, g=0, b=0, frame=frame)
-                vis.draw_vector(f'{namespace}/inference', mu_k_in, (mat.T[1][:3] + mu_k_out) * visual_scaling, r=0, g=1, b=0, frame=frame)
-                vis.draw_vector(f'{namespace}/inference', mu_k_in, (mat.T[2][:3] + mu_k_out) * visual_scaling, r=0, g=0, b=1, frame=frame)
+                vis.draw_text(f'{namespace}/labels', mu_k_in / gmm._general_scale, f'{d} {k}', height=0.04)
+                vis.draw_vector(f'{namespace}/inference', mu_k_in / gmm._general_scale, (mat.T[0][:3] + mu_k_out / gmm._general_scale) * visual_scaling, r=1, g=0, b=0, frame=frame)
+                vis.draw_vector(f'{namespace}/inference', mu_k_in / gmm._general_scale, (mat.T[1][:3] + mu_k_out / gmm._general_scale) * visual_scaling, r=0, g=1, b=0, frame=frame)
+                vis.draw_vector(f'{namespace}/inference', mu_k_in / gmm._general_scale, (mat.T[2][:3] + mu_k_out / gmm._general_scale) * visual_scaling, r=0, g=0, b=1, frame=frame)
 
 
             # vis.draw_poses(f'{namespace}/inference', np.eye(4), 1.0, 0.005, poses, r=1, g=1, b=1, a=1, frame=frame)
@@ -156,7 +156,7 @@ def draw_gmm(vis, namespace, gmm, dimensions=None, visual_scaling=1.0, frame=Non
             for k, (mu_k, sigma_k) in enumerate(zip(gmm.mu(dims), gmm.sigma(dims, dims))):
                 w, v = np.linalg.eig(sigma_k)
                 
-                vis.draw_ellipsoid(f'{namespace}/variance', f_rot_trans(v, mu_k), w / visual_scaling, frame=frame)
+                vis.draw_ellipsoid(f'{namespace}/variance', f_rot_trans(v, mu_k / gmm._general_scale), w / visual_scaling, frame=frame)
     vis.render(f'{namespace}/labels', 
                f'{namespace}/inference', 
                f'{namespace}/variance')
@@ -171,10 +171,12 @@ def draw_gmm_stats(vis, namespace, gmm, observation, frame=None):
 
     activations = np.nan_to_num(activations / activations.sum()).flatten()
 
+    print(activations)
+
     vis.begin_draw_cycle(f'{namespace}/stats')
     for mu_k in [gmm.mu(v) for k, v in gmm.semantic_obs_dims().items() if len(v) == 3]:
         for k, a in enumerate(activations):
-            vis.draw_vector(f'{namespace}/stats', mu_k[k], (0, 0, a), frame=frame)
+            vis.draw_vector(f'{namespace}/stats', mu_k[k] / gmm._general_scale, (0, 0, a), frame=frame)
     
     vis.render(f'{namespace}/stats')
 

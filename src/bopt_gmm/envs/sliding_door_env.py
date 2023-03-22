@@ -83,8 +83,12 @@ class SlidingDoorEnv(Env):
 
         # print(f'Original: {temp_eef_pose}\nResolved EEF state: {self.eef.pose}\nDesired: {self._init_pose}\nPeg pos: {peg_position}')
 
-        self.controller     = CartesianRelativePointCOrientationController(self.robot, self.eef)
-        # self.controller     = CartesianRelativeVPointCOrientationController(self.robot, self.eef, 0.02)
+        if cfg.robot.controller == 'relative':
+            self.controller     = CartesianRelativePointCOrientationController(self.robot, self.eef)
+        elif cfg.robot.controller == 'virtual point':
+            self.controller     = CartesianRelativeVPointCOrientationController(self.robot, self.eef, 0.02)
+        else:
+            raise Exception(f'Unknown controller "{cfg.robot.controller}"')
 
         self.render_camera  = PerspectiveCamera(self.sim, self.render_size[:2], 
                                                 50, 0.1, 10.0, 
