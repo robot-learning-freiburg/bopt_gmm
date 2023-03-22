@@ -72,6 +72,7 @@ if __name__ == '__main__':
 
 
     if args.generator == 'seds':
+        trajs = [t * 1000.0 for t in trajs]
         x0, xT, data, o_idx = gen_seds_data_from_trajectories(trajs, dt)
 
         print_seds_data_analysis(x0, xT, data, o_idx)
@@ -85,6 +86,8 @@ if __name__ == '__main__':
 
         # # exit()
         seds = SEDS_MATLAB(os.environ['SEDS_PATH'])
+
+        model_kwargs['general_scale'] = 1000.0
 
         gmm = seds.fit_model(x0, xT, data, o_idx, args.n_priors, args.objective, dt, 
                              args.tol_cutting, args.max_iter, 
