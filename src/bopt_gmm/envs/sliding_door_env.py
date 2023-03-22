@@ -85,7 +85,7 @@ class SlidingDoorEnv(Env):
 
         if cfg.robot.controller == 'relative':
             self.controller     = CartesianRelativePointCOrientationController(self.robot, self.eef)
-        elif cfg.robot.controller == 'virtual point':
+        elif cfg.robot.controller == 'virtual':
             self.controller     = CartesianRelativeVPointCOrientationController(self.robot, self.eef, 0.02)
         else:
             raise Exception(f'Unknown controller "{cfg.robot.controller}"')
