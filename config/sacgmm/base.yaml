@@ -9,8 +9,10 @@ optimize_alpha: True
 init_alpha: 0.2
 model: null
 
-sacgmm_steps: 8
+sacgmm_steps: 30
 episode_steps: 600
+
+observations: null
 
 actor:
   arch: [256, 256]

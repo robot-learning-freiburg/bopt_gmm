@@ -2,16 +2,17 @@ import cv2
 import hydra
 import numpy as np
 
-from argparse                   import ArgumentParser
-from ConfigSpace                import ConfigurationSpace
-from ConfigSpace                import UniformFloatHyperparameter
-from dataclasses                import dataclass
-from datetime                   import datetime
-from math                       import inf as Infinity
-from omegaconf                  import OmegaConf
-from pathlib                    import Path
-from skopt                      import gp_minimize
-from tqdm                       import tqdm
+from argparse      import ArgumentParser
+from ConfigSpace   import ConfigurationSpace
+from ConfigSpace   import UniformFloatHyperparameter
+from dataclasses   import dataclass
+from datetime      import datetime
+from math          import inf as Infinity
+from omegaconf     import OmegaConf
+from pathlib       import Path
+from skopt         import gp_minimize
+from tqdm          import tqdm
+from torch         import nn
 
 from bopt_gmm.bopt import BOPTGMMCollectAndOptAgent, \
                           GMMOptAgent,               \
@@ -102,7 +103,8 @@ class SACGMMExperimentHook(SACGMMEnvCallback):
 
 
 def build_sacgmm(env, gmm_agent, gripper_command, sacgmm_config, logger):
-    sacgmm_env = SACGMMEnv(env, gmm_agent, gripper_command, sacgmm_config)
+    sacgmm_env = SACGMMEnv(env, gmm_agent, gripper_command, sacgmm_config, 
+                           obs_filter=set(sacgmm_config.observations))
 
     model = SAC('MlpPolicy', sacgmm_env, 
                 learning_rate=sacgmm_config.learning_rate,
@@ -112,7 +114,9 @@ def build_sacgmm(env, gmm_agent, gripper_command, sacgmm_config, logger):
                 gamma=sacgmm_config.gamma,
                 policy_kwargs=dict(
                     net_arch=dict(pi=sacgmm_config.actor.arch, qf=sacgmm_config.critic.arch),
-                    n_critics=sacgmm_config.critic.num
+                    n_critics=sacgmm_config.critic.num,
+                    activation_fn=nn.SiLU,
+                    clip_mean=9.0
                 ))
     if logger is not None:
         model.set_logger(logger)
@@ -248,8 +252,14 @@ if __name__ == '__main__':
     cfg = hydra.compose(args.hy, overrides=args.overrides)
     env = ENV_TYPES[cfg.env.type](cfg.env, args.show_gui)
 
+    if cfg.sacgmm.observations is None:
+        print(f'sacgmm.observations in hydra config cannot be null')
+        exit(-1)
+
     if args.mode == 'sacgmm':
         conf_hash = conf_checksum(cfg)
+
+        args.run_prefix = f'{args.run_prefix}_{conf_hash}'        
 
         if args.data_dir is not None:
             args.data_dir = f'{args.data_dir}_{conf_hash}'
