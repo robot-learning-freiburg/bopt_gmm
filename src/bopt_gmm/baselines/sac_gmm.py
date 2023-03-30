@@ -49,6 +49,13 @@ class SACGMMEnv(Env):
         self._cb.remove(cb)
 
     @property
+    def config_space(self):
+        return self.env.config_space
+
+    def config_dict(self):
+        return self.env.config_dict()
+
+    @property
     @lru_cache(1)
     def observation_space(self):
         lb = []

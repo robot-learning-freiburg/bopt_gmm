@@ -1,3 +1,6 @@
+import torch
+import numpy as np
+
 from dataclasses import dataclass
 
 from bopt_gmm.logging import MP4VideoLogger
@@ -34,6 +37,47 @@ class AgentWrapper(object):
         # elif 'force' in obs:
         #     obs['force'] = obs['force'] * self._force_norm
         return {'motion': self.model.predict(obs).flatten(), 'gripper': self._gripper_command}
+
+    def reset(self):
+        pass
+
+    def step(self, *args):
+        pass
+    
+    def has_gp_stage(self):
+        return False
+
+    def is_in_gp_stage(self):
+        return False
+
+    def get_bopt_step(self):
+        self.pseudo_bopt_step += 1
+        return self.pseudo_bopt_step
+
+
+class TorchAgentWrapper(object):
+    def __init__(self, model : torch.nn.Module, gripper_command=0.0, observations=['position']) -> None:
+        self.model = model
+        self.pseudo_bopt_step = 0
+        self._gripper_command = gripper_command
+        self._observations    = observations
+        self._lstm_state      = None
+
+    def predict(self, obs):
+        # if callable(self._force_norm):
+        #     obs = self._force_norm(obs)
+        # elif 'force' in obs:
+        #     obs['force'] = obs['force'] * self._force_norm
+
+        flat_obs = np.hstack([obs[o] for o in self._observations])
+
+        with torch.no_grad():
+            action, self._lstm_state = self.model.predict(torch.tensor(flat_obs, dtype=torch.float32).to(self.model.device), self._lstm_state)
+
+            return {'motion': action.flatten(), 'gripper': self._gripper_command}
+
+    def reset(self):
+        self._lstm_state = None
 
     def step(self, *args):
         pass

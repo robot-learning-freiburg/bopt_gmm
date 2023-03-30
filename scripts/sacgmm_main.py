@@ -2,16 +2,17 @@ import cv2
 import hydra
 import numpy as np
 
-from argparse                   import ArgumentParser
-from ConfigSpace                import ConfigurationSpace
-from ConfigSpace                import UniformFloatHyperparameter
-from dataclasses                import dataclass
-from datetime                   import datetime
-from math                       import inf as Infinity
-from omegaconf                  import OmegaConf
-from pathlib                    import Path
-from skopt                      import gp_minimize
-from tqdm                       import tqdm
+from argparse      import ArgumentParser
+from ConfigSpace   import ConfigurationSpace
+from ConfigSpace   import UniformFloatHyperparameter
+from dataclasses   import dataclass
+from datetime      import datetime
+from math          import inf as Infinity
+from omegaconf     import OmegaConf
+from pathlib       import Path
+from skopt         import gp_minimize
+from tqdm          import tqdm
+from torch         import nn
 
 from bopt_gmm.bopt import BOPTGMMCollectAndOptAgent, \
                           GMMOptAgent,               \
@@ -61,6 +62,13 @@ from stable_baselines3.sac import MlpPolicy
 from tqdm import tqdm
 
 
+class SB3WBLogger(WBLogger):
+    def record(self, name, value, **kwargs):
+        self.run.log({name: value})
+
+    def dump(self, *args, **kwargs):
+        pass
+
 class SACGMMExperimentHook(SACGMMEnvCallback):
     def __init__(self, logger, agent, data_dir=None, ep_offset=0, ep_end_eval=None):
         self.logger   = logger
@@ -95,7 +103,8 @@ class SACGMMExperimentHook(SACGMMEnvCallback):
 
 
 def build_sacgmm(env, gmm_agent, gripper_command, sacgmm_config, logger):
-    sacgmm_env = SACGMMEnv(env, gmm_agent, gripper_command, sacgmm_config)
+    sacgmm_env = SACGMMEnv(env, gmm_agent, gripper_command, sacgmm_config, 
+                           obs_filter=set(sacgmm_config.observations))
 
     model = SAC('MlpPolicy', sacgmm_env, 
                 learning_rate=sacgmm_config.learning_rate,
@@ -105,33 +114,63 @@ def build_sacgmm(env, gmm_agent, gripper_command, sacgmm_config, logger):
                 gamma=sacgmm_config.gamma,
                 policy_kwargs=dict(
                     net_arch=dict(pi=sacgmm_config.actor.arch, qf=sacgmm_config.critic.arch),
-                    n_critics=sacgmm_config.critic.num
+                    n_critics=sacgmm_config.critic.num,
+                    activation_fn=nn.SiLU,
+                    clip_mean=9.0
                 ))
+    if logger is not None:
+        model.set_logger(logger)
     
     return model, sacgmm_env
 
 
-def evaluate_sacgmm(env, sacgmm_agent : MlpPolicy, num_episodes, max_steps):
-    returns = []
+def evaluate_sacgmm(env, sacgmm_agent : MlpPolicy, num_episodes, max_steps, ic_path=None):
+    episode_returns = []
+    episode_lengths = []
+    
+    successful_episodes = 0
 
-    successes = []
+    if ic_path is not None:
+        fields = env.config_space
+        fields += ['episode', 'accuracy', 'steps', 'reward', 'success']
 
-    for x in tqdm(range(num_episodes), desc='Evaluating model'):
+        ic_logger = CSVLogger(ic_path, fields)
+    else:
+        ic_logger = None
+
+    for ep in tqdm(range(num_episodes), desc='Evaluating model'):
         obs  = env.reset()
         done = False
+
+        initial_conditions = env.config_dict()
 
         while not done:
             action = sacgmm_agent.predict(obs)[0]
             obs, reward, done, info = env.step(action)
         
-        successes.append(int(info['success']))
+        episode_returns.append(reward)
+        episode_lengths.append(env._n_env_steps)   
 
-    return np.mean(successes)
+        if info["success"]:
+            successful_episodes += 1
+
+        stats = {'accuracy': float(info['success']), 
+                 'success': int(info['success']),
+                 'reward': reward, 
+                 'steps': env._n_env_steps}
+
+        if ic_logger is not None:
+            ic = initial_conditions
+            ic.update(stats)
+            ic['episode'] = ep
+            ic_logger.log(ic)
+
+    return successful_episodes / ep, episode_returns, episode_lengths
 
 
 def train_sacgmm(env, cfg, num_training_cycles, max_steps, 
                  wandb, data_dir, run_id, deep_eval_length=0, ckpt_freq=10):
-    logger = WBLogger('bopt-gmm', run_id, True) if wandb else BlankLogger()
+    logger = SB3WBLogger('bopt-gmm', run_id, True) if wandb else BlankLogger()
     logger.log_config(cfg)
     
     boptgmm_config = cfg.bopt_agent
@@ -145,6 +184,15 @@ def train_sacgmm(env, cfg, num_training_cycles, max_steps,
         if deep_eval_length > 0:
             logger.define_metric('bopt deep eval accuracy', BOPT_TIME_SCALE)
 
+    if data_dir is not None:
+        fields = env.config_space
+        fields += [BOPT_TIME_SCALE, 'steps', 'success']
+
+        # Fix location generation
+        ic_logger = CSVLogger(f'{data_dir}/sacgmm_initial_conditions.csv', fields)
+    else:
+        ic_logger = None
+
     gmm = GMM.load_model(boptgmm_config.gmm.model)
     gmm_agent = GMMOptAgent(gmm, boptgmm_config)
     model, sacgmm_env = build_sacgmm(env, gmm_agent, boptgmm_config.gripper_command, sacgmm_config, logger)
@@ -156,14 +204,19 @@ def train_sacgmm(env, cfg, num_training_cycles, max_steps,
     sacgmm_env.reset()
 
     def ep_end_eval_cb(hook):
-        if hook.episode_ended and deep_eval_length > 0 and hook.ep_count % ckpt_freq == 0:
-            model.policy.set_training_mode(False)
-            if data_dir is not None:
-                model.save(f'{data_dir}/sacgmm_model_{hook.ep_count:02d}.npz')
+        if hook.episode_ended: 
+            if deep_eval_length > 0 and hook.ep_count % ckpt_freq == 0:
+                model.policy.set_training_mode(False)
+                if data_dir is not None:
+                    model.save(f'{data_dir}/sacgmm_model_{hook.ep_count:02d}.npz')
 
-            e_env = sacgmm_env.eval_copy()
-            accuracy = evaluate_sacgmm(e_env, model, deep_eval_length, max_steps)
-            logger.log({'bopt deep eval accuracy': accuracy})
+                e_env = sacgmm_env.eval_copy()
+
+                eval_ic_path = f'{data_dir}/eval_{hook.ep_count}_ic.csv' if data_dir is not None else None
+
+                accuracy, ep_returns, ep_lengths = evaluate_sacgmm(e_env, model, deep_eval_length, max_steps, ic_path=eval_ic_path)
+                logger.log({'bopt deep eval accuracy': accuracy})
+
 
     hook = SACGMMExperimentHook(logger, model, data_dir, ep_offset=sacgmm_env._ep_count, ep_end_eval=ep_end_eval_cb)
 
@@ -199,8 +252,14 @@ if __name__ == '__main__':
     cfg = hydra.compose(args.hy, overrides=args.overrides)
     env = ENV_TYPES[cfg.env.type](cfg.env, args.show_gui)
 
+    if cfg.sacgmm.observations is None:
+        print(f'sacgmm.observations in hydra config cannot be null')
+        exit(-1)
+
     if args.mode == 'sacgmm':
         conf_hash = conf_checksum(cfg)
+
+        args.run_prefix = f'{args.run_prefix}_{conf_hash}'        
 
         if args.data_dir is not None:
             args.data_dir = f'{args.data_dir}_{conf_hash}'
