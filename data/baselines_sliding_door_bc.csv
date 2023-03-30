@@ -1,0 +1,21 @@
+model,env,noise,accuracy,date
+models/bc/lstm_f.npz,sliding_door,0.0,0.11,2023-03-29 21:08:34.440868
+models/bc/lstm_f.npz,sliding_door,0.01,0.05,2023-03-29 21:08:41.371809
+models/bc/lstm_f.npz,sliding_door,0.02,0.09,2023-03-29 21:08:32.182977
+models/bc/lstm_f.npz,sliding_door,0.03,0.04,2023-03-29 21:08:47.053436
+models/bc/lstm_f.npz,sliding_door,0.05,0.03,2023-03-29 21:08:45.320493
+models/bc/lstm_ft.npz,sliding_door,0.0,0.04,2023-03-29 21:09:30.376047
+models/bc/lstm_ft.npz,sliding_door,0.01,0.02,2023-03-29 21:09:47.851310
+models/bc/lstm_ft.npz,sliding_door,0.02,0.04,2023-03-29 21:09:44.534423
+models/bc/lstm_ft.npz,sliding_door,0.03,0.03,2023-03-29 21:09:44.744508
+models/bc/lstm_ft.npz,sliding_door,0.05,0.01,2023-03-29 21:09:50.284240
+models/bc/lstm_geom.npz,sliding_door,0.0,0.26,2023-03-29 21:08:40.965737
+models/bc/lstm_geom.npz,sliding_door,0.01,0.16,2023-03-29 21:08:56.422542
+models/bc/lstm_geom.npz,sliding_door,0.02,0.16,2023-03-29 21:08:54.270794
+models/bc/lstm_geom.npz,sliding_door,0.03,0.24,2023-03-29 21:08:25.361967
+models/bc/lstm_geom.npz,sliding_door,0.05,0.13,2023-03-29 21:08:52.308743
+models/bc/lstm_t.npz,sliding_door,0.0,0.09,2023-03-29 21:08:58.527602
+models/bc/lstm_t.npz,sliding_door,0.01,0.1,2023-03-29 21:08:59.439217
+models/bc/lstm_t.npz,sliding_door,0.02,0.08,2023-03-29 21:08:55.408187
+models/bc/lstm_t.npz,sliding_door,0.03,0.06,2023-03-29 21:08:50.339237
+models/bc/lstm_t.npz,sliding_door,0.05,0.11,2023-03-29 21:08:40.743207
