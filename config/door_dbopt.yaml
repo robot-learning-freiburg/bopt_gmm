@@ -4,4 +4,6 @@ defaults:
 
 bopt_agent:
   base_accuracy: 0.65
-  opt_dims: [position]
+  opt_dims:
+    means: null
+    cvars: null

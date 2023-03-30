@@ -28,3 +28,4 @@ robot:
     position: [0.45, 0, 0.30]
     orientation: [-2.2, 0, -1.57]
     gripper_width: 0.05
+  controller: relative   # Options: relative, virtual
