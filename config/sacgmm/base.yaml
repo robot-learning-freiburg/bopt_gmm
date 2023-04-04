@@ -1,13 +1,15 @@
-learning_rate: 3e-4 
-alpha_lr: 3e-4
+gamma: 0.99
+tau: 0.005
+lr_actor: 3e-4
+lr_critic: 3e-4
+lr_alpha: 3e-4
+init_alpha: 0.01
 batch_size: 256
-gamma: 0.99 
-tau: 0.005 
-replay_buffer_size: 3e5
 warm_start_steps: 256
-optimize_alpha: True
-init_alpha: 0.2
-model: null
+fill_strategy: 'random'
+replay_buffer_size: 100000
+replay_buffer_path: null
+optimize_alpha: true
 
 sacgmm_steps: 30
 episode_steps: 600
@@ -15,9 +17,12 @@ episode_steps: 600
 observations: null
 
 actor:
-  arch: [256, 256]
+  hidden_layers: 2
+  hidden_dim: 256
+  init_w: 0.001
 
 critic:
-  arch: [256, 256]
-  num: 2
+  hidden_layers: 2
+  hidden_dim: 256
+  init_w: 0.001
 
