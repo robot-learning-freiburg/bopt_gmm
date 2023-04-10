@@ -124,7 +124,7 @@ class RealDrawerEnv(Env):
 
     @property
     def visualizer(self):
-        return self.sim.visualizer
+        return self._vis
 
     @property
     @lru_cache(1)
@@ -213,6 +213,7 @@ class RealDrawerEnv(Env):
 
         print('Bla5')
         self._robot.move_joint_position(q_start, vel_scale=0.15)
+        self._robot.set_gripper_position(0.0)
 
         self.ref_P_v_goal = self._robot.state.O_T_EE[:3, 3].flatten()
 

@@ -8,7 +8,8 @@ import threading
 from datetime import datetime
 from aiohttp import web
 from iai_bullet_sim import Vector3, \
-                           res_pkg_path
+                           res_pkg_path, \
+                           DebugVisualizer
 from omegaconf import ListConfig
 
 from bopt_gmm.utils import save_demo_npz
@@ -50,18 +51,22 @@ def sim_loop(env, sim_state, save_dir):
             action = {'motion': np.zeros(3),
                       'gripper': 0.5}
             if sim_state.last_action is not None:
-                cam_pose  = vis.get_camera_pose()
-                right_dir = cam_pose.dot(Vector3.unit_x()) * Vector3(1, 1, 0)
-                # print(cam_pose.matrix())
-                right_dir /= right_dir.norm()
-                fwd_dir    = Vector3.unit_z().cross(right_dir)
-
                 raw_action = Vector3(*sim_state.last_action[:3])
                 raw_action = sim_state.input_mapping.dot(raw_action)
-                # print(raw_action)
-                cat_action = fwd_dir   * sim_state.last_action[1] + \
-                             right_dir * sim_state.last_action[0] + \
-                             Vector3.unit_z() * sim_state.last_action[2]
+
+                if isinstance(vis, DebugVisualizer):
+                    cam_pose  = vis.get_camera_pose()
+                    right_dir = cam_pose.dot(Vector3.unit_x()) * Vector3(1, 1, 0)
+                    # print(cam_pose.matrix())
+                    right_dir /= right_dir.norm()
+                    fwd_dir    = Vector3.unit_z().cross(right_dir)
+
+                    # print(raw_action)
+                    cat_action = fwd_dir   * sim_state.last_action[1] + \
+                                 right_dir * sim_state.last_action[0] + \
+                                 Vector3.unit_z() * sim_state.last_action[2]
+                else:
+                    cat_action = Vector3(*raw_action)
 
                 action['motion'] = cat_action.numpy() * 0.5
                 sim_state.last_action = None

@@ -1,5 +1,5 @@
 defaults:
-  - door_scenario
+  - real_drawer_scenario
 
 teleoperate:
   lin_input_mapping: [[0, 0, 1],

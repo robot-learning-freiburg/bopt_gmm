@@ -1,0 +1,7 @@
+defaults:
+  - real_drawer_scenario
+
+teleoperate:
+  lin_input_mapping: [[0.5,    0,   0],
+                      [  0,    0, 0.5],
+                      [  0, -0.5,   0]]
