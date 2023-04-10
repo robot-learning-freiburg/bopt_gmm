@@ -56,8 +56,8 @@ class GMMCart3D(GMM):
 add_gmm_model(GMMCart3D)
 
 class GMMCart3DJS(GMM):
-    def __init__(self, priors, means, cvar, dim_names=[]):
-        super().__init__(priors, means, cvar)
+    def __init__(self, priors, means, cvar, dim_names=[], general_scale=1.0):
+        super().__init__(priors, means, cvar, general_scale=general_scale)
         self._dim_names = dim_names
         self.GIVEN = tuple(range(3 + len(dim_names)))
 
@@ -130,8 +130,8 @@ add_gmm_model(GMMCart3DJS)
 class GMMCart3DForce(GMM):
     GIVEN = (0, 1, 2, 3, 4, 5)
 
-    def __init__(self, priors, means=12, cvar=None, force_scale=1.0):
-        super().__init__(priors, means, cvar)
+    def __init__(self, priors, means=12, cvar=None, force_scale=1.0, general_scale=1.0):
+        super().__init__(priors, means, cvar, general_scale=general_scale)
         self._force_scale = force_scale
 
     def predict(self, obs_dict, dims=GIVEN, full=False):

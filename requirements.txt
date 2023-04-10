@@ -10,6 +10,7 @@ scikit-optimize
 smac
 dearpygui
 tqdm
+rich
 pandas
 roboticstoolbox-python
 stable-baselines3

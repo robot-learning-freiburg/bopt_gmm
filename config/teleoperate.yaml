@@ -1,38 +1,7 @@
 defaults:
-  - sliding_door_scenario
-
-save_dir: demos_sliding_door/
-show_gui: True
-max_episode_steps: 1000
-with_force: False
-with_gripper_width: False
-with_tactile_sensor: False
-with_orientation: False
-only_pitch: False
-only_yaw: False
+  - door_scenario
 
 teleoperate:
   lin_input_mapping: [[0, 0, 1],
                       [0, 1, 0],
                       [1, 0, 0]]
-
-env:
-  settings:
-    show_gui: ${show_gui}
-    max_episode_steps: ${max_episode_steps}
-  observation:
-    with_orientation: ${with_orientation}
-    only_pitch: ${only_pitch}
-    only_yaw: ${only_yaw}
-    with_gripper_width: ${with_gripper_width}
-    with_force: ${with_force}
-    with_tactile_sensor: ${with_tactile_sensor}
-    relative: False
-  action:
-    with_gripper_width: ${with_gripper_width}
-    with_orientation: ${with_orientation}
-  # sawyer_gripper:
-  #   robot_params:
-  #     # urdf_path: "data/robots/sawyer_fixed_wsg50.urdf"
-  #     # urdf_path: "data/robots/sawyer_wsg50.urdf"
-  #     urdf_path: "data/robots/sawyer_wsg50_plug_IN.urdf"

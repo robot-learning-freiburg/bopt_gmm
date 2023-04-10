@@ -9,6 +9,3 @@ bopt_agent:
     force_norm: 1
   gripper_command: 0.5
 
-env:
-  observation:
-    with_noise: False

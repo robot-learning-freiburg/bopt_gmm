@@ -32,6 +32,9 @@ from bopt_gmm import bopt, \
                      common, \
                      gmm
 
+from bopt_gmm.baselines import LSTMPolicy, \
+                               LSTMPolicyConfig
+
 from bopt_gmm.gmm.generation import seds_gmm_generator, \
                                     em_gmm_generator
 
@@ -99,6 +102,7 @@ def evaluate_agent(env, agent, num_episodes=100, max_steps=600,
             visualizer.render('gmm_stats')
 
     for ep in tqdm(range(num_episodes), desc='Evaluating Agent'):
+        agent.reset()
         post_step_hooks = [] if live_plot_hook is None else [live_plot_hook]
 
         if video_dir is not None:
@@ -478,7 +482,7 @@ if __name__ == '__main__':
     parser.add_argument('hy', type=str, help='Hydra config to use. Relative to root of "config" dir')
     parser.add_argument('--overrides', default=[], type=str, nargs='*', help='Overrides for hydra config')
     parser.add_argument('--trajectories', default=[], nargs='*', help='Trajectories to use for regularization')
-    parser.add_argument('--mode', default='bopt-gmm', help='Modes to run the program in.', choices=['bopt-gmm', 'eval-gmm', 'vis'])
+    parser.add_argument('--mode', default='bopt-gmm', help='Modes to run the program in.', choices=['bopt-gmm', 'eval-gmm', 'eval-lstm'])
     parser.add_argument('--run-prefix', default=None, help='Prefix for the generated run-id for the logger')
     parser.add_argument('--wandb', action='store_true', help='Enable W&B logging.')
     parser.add_argument('--video', action='store_true', help='Write video.')
@@ -487,6 +491,7 @@ if __name__ == '__main__':
     parser.add_argument('--data-dir', default=None, help='Directory to save models and data to. Will be created if non-existent')
     parser.add_argument('--ckpt-freq', default=10, type=int, help='Frequency at which to save and evaluate models')
     parser.add_argument('--eval-out', default=None, help='File to write results of evaluation to. Will write in append mode.')
+    parser.add_argument('--bc-inputs', default=['position'], nargs='+', help='Observations to feed to BC policy.')
     args = parser.parse_args()
 
     # Point hydra to the root of your config dir. Here it's hard-coded, but you can also
@@ -554,6 +559,47 @@ if __name__ == '__main__':
             with open(args.eval_out, 'w') as f:
                 f.write('model,env,noise,accuracy,date\n')
                 f.write(f'{cfg.bopt_agent.gmm.model},{cfg.env.type},{cfg.env.noise.position.variance},{acc},{datetime.now()}\n')
+    
+    elif args.mode == 'eval-lstm':
+        policy_path = Path(cfg.bopt_agent.gmm.model)
+        policy = LSTMPolicy.load_model(cfg.bopt_agent.gmm.model)
+        
+
+        if args.wandb:
+            run_name = f'eval_{cfg.bopt_agent.gmm.model[:-4]}'
+            if args.run_prefix is not None:
+                run_name = args.run_prefix
+            logger = WBLogger('bopt-gmm', f'eval_{cfg.bopt_agent.gmm.model[:-4]}', False)
+            logger.log_config({'type': cfg.bopt_agent.gmm.type, 
+                               'model': cfg.bopt_agent.gmm.model,
+                               'env': cfg.env})
+        else: 
+            logger = None
+
+        if args.video and args.data_dir is not None:
+            video_dir = f'{args.data_dir}_{policy_path.name[:-4]}'
+        else:
+            video_dir = None
+
+        agent = common.TorchAgentWrapper(policy, 
+                                        cfg.bopt_agent.gripper_command, 
+                                        observations=args.bc_inputs)
+
+        args.deep_eval = 10 if args.deep_eval == 0 else args.deep_eval
+
+        acc, returns, lengths = evaluate_agent(env, agent,
+                                               num_episodes=args.deep_eval,
+                                               max_steps=cfg.bopt_agent.num_episode_steps,
+                                               logger=logger,
+                                               video_dir=video_dir,
+                                               show_forces=args.show_gui,
+                                               verbose=1)
+    
+        if args.eval_out is not None:
+            with open(args.eval_out, 'w') as f:
+                f.write('model,env,noise,accuracy,date\n')
+                f.write(f'{cfg.bopt_agent.gmm.model},{cfg.env.type},{cfg.env.noise.position.variance},{acc},{datetime.now()}\n')
+
 
     # Pos GMM result: 52%
     # F-GMM result: 40%

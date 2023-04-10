@@ -1,0 +1,26 @@
+model,env,noise,accuracy,date
+models/bc/sliding_door_lstm_f.npz,sliding_door,0.0,0.03,2023-03-30 12:29:49.362814
+models/bc/sliding_door_lstm_f.npz,sliding_door,0.01,0.01,2023-03-30 12:29:57.458951
+models/bc/sliding_door_lstm_f.npz,sliding_door,0.02,0.06,2023-03-30 12:29:48.397510
+models/bc/sliding_door_lstm_f.npz,sliding_door,0.03,0.05,2023-03-30 12:29:54.757356
+models/bc/sliding_door_lstm_f.npz,sliding_door,0.05,0.05,2023-03-30 12:29:44.002996
+models/bc/sliding_door_lstm_ft.npz,sliding_door,0.0,0.02,2023-03-30 12:30:27.206804
+models/bc/sliding_door_lstm_ft.npz,sliding_door,0.01,0.02,2023-03-30 12:30:34.085004
+models/bc/sliding_door_lstm_ft.npz,sliding_door,0.02,0.02,2023-03-30 12:30:32.402529
+models/bc/sliding_door_lstm_ft.npz,sliding_door,0.03,0.03,2023-03-30 12:30:41.597252
+models/bc/sliding_door_lstm_ft.npz,sliding_door,0.05,0.03,2023-03-30 12:30:34.061099
+models/bc/sliding_door_lstm_geom.npz,sliding_door,0.0,0.57,2023-03-30 12:29:49.235500
+models/bc/sliding_door_lstm_geom.npz,sliding_door,0.01,0.49,2023-03-30 12:29:54.293747
+models/bc/sliding_door_lstm_geom.npz,sliding_door,0.02,0.43,2023-03-30 12:30:02.240585
+models/bc/sliding_door_lstm_geom.npz,sliding_door,0.03,0.38,2023-03-30 12:29:55.602276
+models/bc/sliding_door_lstm_geom.npz,sliding_door,0.05,0.28,2023-03-30 12:29:57.009059
+models/bc/sliding_door_lstm_js.npz,sliding_door,0.0,0.57,2023-03-30 12:29:47.824309
+models/bc/sliding_door_lstm_js.npz,sliding_door,0.01,0.66,2023-03-30 12:29:48.249867
+models/bc/sliding_door_lstm_js.npz,sliding_door,0.02,0.55,2023-03-30 12:29:50.909065
+models/bc/sliding_door_lstm_js.npz,sliding_door,0.03,0.46,2023-03-30 12:29:59.370913
+models/bc/sliding_door_lstm_js.npz,sliding_door,0.05,0.3,2023-03-30 12:29:55.441837
+models/bc/sliding_door_lstm_t.npz,sliding_door,0.0,0.07,2023-03-30 12:30:42.011181
+models/bc/sliding_door_lstm_t.npz,sliding_door,0.01,0.04,2023-03-30 12:30:37.785774
+models/bc/sliding_door_lstm_t.npz,sliding_door,0.02,0.03,2023-03-30 12:30:52.227234
+models/bc/sliding_door_lstm_t.npz,sliding_door,0.03,0.03,2023-03-30 12:30:47.795064
+models/bc/sliding_door_lstm_t.npz,sliding_door,0.05,0.05,2023-03-30 12:30:39.135251

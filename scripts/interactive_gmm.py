@@ -59,6 +59,7 @@ if __name__ == '__main__':
 
 
     def cb_js(msg : JointStateMsg):
+        return
         new_update = dict(zip(msg.name, msg.position))
         if app_state.last_update is None or max([app_state.last_update[k] != v for k, v in new_update.items()]):
             app_state.last_update = new_update

@@ -33,3 +33,4 @@ robot:
       min: [0.40, -0.25, 0.05]
       max: [0.50,  0.25, 0.35]
     gripper_width: 0.05
+  controller: relative   # Options: relative, virtual
