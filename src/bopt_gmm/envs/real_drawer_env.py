@@ -7,6 +7,8 @@ try:
     from rl_franka.panda import Panda
     import roboticstoolbox as rp
     import spatialmath     as sm
+    
+    from roebots import ROSVisualizer
 except ModuleNotFoundError: # Just don't load this if we don't have the panda lib present
     Panda = None
 
@@ -24,6 +26,7 @@ from .utils     import BoxSampler, \
                        NoiseSampler
 
 from geometry_msgs.msg import WrenchStamped as WrenchStampedMsg
+from std_msgs.msg      import Float64       as Float64Msg
 
 
 class RealDrawerEnv(Env):
@@ -34,12 +37,13 @@ class RealDrawerEnv(Env):
         self._ik_model = rp.models.Panda()
 
         self.workspace = AABB(Point3(-0.4, -0.4, 0), 
-                              Point3( 0.4,  0.4, 0.8))
+                              Point3( 0.4,  0.4, 0.7))
 
         self.tfBuffer = tf2_ros.Buffer()
         self.listener = tf2_ros.TransformListener(self.tfBuffer)
 
-        self.stiffness = [cfg.robot.stiffness.linear]*3 + [cfg.robot.stiffness.angular]*3
+        self.lin_stiffness = cfg.robot.stiffness.linear
+        self.ang_stiffness = cfg.robot.stiffness.angular
 
         self._robot   = Panda(cfg.robot.state_prefix, 
                               cfg.robot.controllers_prefix)
@@ -60,6 +64,8 @@ class RealDrawerEnv(Env):
 
         self._ee_rot = self._ik_model.fkine(self._arm_reset_pose).R
 
+        self._vis = ROSVisualizer('~/vis', world_frame='panda_link0') if show_gui else None
+
         self.starting_position_sampler = BoxSampler(cfg.robot.initial_pose.position.min,
                                                     cfg.robot.initial_pose.position.max)
 
@@ -68,6 +74,11 @@ class RealDrawerEnv(Env):
         self.ref_P_v_goal = None
 
         self.dt = 1 /30
+
+        self.pub_lin_stiffness = rospy.Publisher('/controllers/cartesian_impedance_controller/update_stiffness/linear/f', 
+                                                 Float64Msg, tcp_nodelay=True, queue_size=1)
+        self.pub_ang_stiffness = rospy.Publisher('/controllers/cartesian_impedance_controller/update_stiffness/angular/f', 
+                                                 Float64Msg, tcp_nodelay=True, queue_size=1)
 
         # self._init_pose = Transform(Point3(*robot_init_state.position), initial_rot)
         # self.robot.set_joint_positions(cfg.robot.initial_pose.q, override_initial=True)
@@ -178,10 +189,10 @@ class RealDrawerEnv(Env):
             rospy.sleep(0.3)
 
         print('Bla3')
+        rospy.sleep(0.3)
         # Reset joint space position every couple of episodes
         if self._n_reset % self._joint_reset_every == 0:
             self._robot.move_joint_position(self._arm_reset_pose, 0.15)
-            print('FAKE MOVE ROBOT TO INITIAL Q')
 
         print('Bla4')
         while True:
@@ -206,7 +217,12 @@ class RealDrawerEnv(Env):
         self.ref_P_v_goal = self._robot.state.O_T_EE[:3, 3].flatten()
 
         self._robot.cm.activate_controller(self._robot.CART_IMPEDANCE_CONTROLLER)
-        self._robot.cm.set_cartesian_stiffness(self.stiffness)
+        rospy.sleep(0.3)
+        msg_lin_stiffness = Float64Msg(data=self.lin_stiffness)
+        msg_ang_stiffness = Float64Msg(data=self.ang_stiffness)
+        self.pub_lin_stiffness.publish(msg_lin_stiffness)
+        self.pub_ang_stiffness.publish(msg_ang_stiffness)
+        rospy.sleep(0.3)
 
         print('Bla6')
         self._elapsed_steps = 0
@@ -221,22 +237,31 @@ class RealDrawerEnv(Env):
 
         action_motion = action['motion'] / max(np.abs(action['motion']).max(), 1)
 
+        ref_T_ee_goal = self._ref_T_robot * self._robot.state.O_T_EE
 
-        self.ref_P_v_goal += action_motion * self.dt
+        ref_T_ee_goal[:3, 3] += action_motion *  self.dt * 15
 
-        ref_T_ee  = self._ref_T_robot * self._robot.state.O_T_EE
-        ref_P_ee_pos = ref_T_ee[:3, 3].flatten()
+        # ref_T_ee  = self._ref_T_robot * self._robot.state.O_T_EE
+        # ref_P_ee_pos = ref_T_ee[:3, 3].flatten()
         
-        ee_vp_delta = Point3(*self.ref_P_v_goal) - Point3(*ref_P_ee_pos)
+        # ee_vp_delta = Point3(*self.ref_P_v_goal) - Point3(*ref_P_ee_pos)
 
-        if ee_vp_delta.norm() > 0.05:
-            self.ref_P_v_goal = ref_P_ee_pos + ee_vp_delta.normalized() * 0.05
+        # if ee_vp_delta.norm() > 0.05:
+        #     self.ref_P_v_goal = ref_P_ee_pos + ee_vp_delta.normalized() * 0.05
 
-        ref_T_ee_goal = np.array(sm.SE3.Rt(ref_T_ee[:3, :3], self.ref_P_v_goal, check=False))
+        # ref_T_ee_goal = np.array(sm.SE3.Rt(ref_T_ee[:3, :3], self.ref_P_v_goal, check=False))
 
-        print(ref_T_ee_goal)
+        # print(ref_T_ee_goal)
 
         robot_T_ee_goal = self._robot_T_ref * ref_T_ee_goal
+        robot_T_ee_goal[:3, :3] = self._ee_rot
+
+        if self._vis is not None:
+            self._vis.begin_draw_cycle('action')
+            self._vis.draw_vector('action', self._robot.state.O_T_EE[:3, 3], 
+                                            self._robot_T_ref.R * action_motion)
+            self._vis.draw_poses('action', np.eye(4), 0.1, 0.003, [robot_T_ee_goal])
+            self._vis.render('action')
 
         print(f'Action: {action}\nCurrent EE: {self._robot.state.O_T_EE}\nGoal EE: {robot_T_ee_goal}')
         
@@ -292,20 +317,20 @@ class RealDrawerEnv(Env):
 
         # TODO: ADD FORCE SAFETY CHECK
 
-        try:
-            tf_stamped = self.tfBuffer.lookup_transform(self._robot_frame, self._ref_frame, rospy.Time(0))
+        # try:
+        #     tf_stamped = self.tfBuffer.lookup_transform(self._robot_frame, self._ref_frame, rospy.Time(0))
             
-            quat = sm.UnitQuaternion(tf_stamped.transform.rotation.w,
-                                    (tf_stamped.transform.rotation.x,
-                                        tf_stamped.transform.rotation.y,
-                                        tf_stamped.transform.rotation.z))
+        #     quat = sm.UnitQuaternion(tf_stamped.transform.rotation.w,
+        #                             (tf_stamped.transform.rotation.x,
+        #                                 tf_stamped.transform.rotation.y,
+        #                                 tf_stamped.transform.rotation.z))
 
-            self._robot_T_ref = sm.SE3.Rt(quat.R, (tf_stamped.transform.translation.x, 
-                                                    tf_stamped.transform.translation.y, 
-                                                    tf_stamped.transform.translation.z))
-            self._ref_T_robot = self._robot_T_ref.inv()
-        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
-            pass
+        #     self._robot_T_ref = sm.SE3.Rt(quat.R, (tf_stamped.transform.translation.x, 
+        #                                             tf_stamped.transform.translation.y, 
+        #                                             tf_stamped.transform.translation.z))
+        #     self._ref_T_robot = self._robot_T_ref.inv()
+        # except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
+        #     pass
 
         # print(peg_pos_in_target)
 

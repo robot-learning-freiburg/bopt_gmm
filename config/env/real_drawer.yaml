@@ -23,5 +23,5 @@ robot:
       max: [0.5,  0.1, 0.45]
   joint_reset_frequency: 5  # Return the robot to the original q pose every n steps
   stiffness:
-    linear: 200
-    angular: 10
+    linear: 600
+    angular: 20
