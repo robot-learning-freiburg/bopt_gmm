@@ -35,6 +35,7 @@ def sim_loop(env, sim_state, save_dir):
         raise Exception('Teleop can only performed with a visualizer')
 
     observations = []
+    actions      = []
     while not sim_state.should_shutdown:
         start = datetime.now()
         if sim_state.should_reset or sim_state.should_save:
@@ -71,6 +72,7 @@ def sim_loop(env, sim_state, save_dir):
                 action['motion'] = cat_action.numpy() * 0.5
                 sim_state.last_action = None
             observation, reward, done, info = env.step(action)
+            observation.update(action)
             observations.append(observation)
             if done:
                 sim_state.should_reset = True

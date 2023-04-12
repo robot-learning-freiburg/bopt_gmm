@@ -101,6 +101,13 @@ def evaluate_agent(env, agent, num_episodes=100, max_steps=600,
             gmm_utils.draw_gmm_stats(visualizer, 'gmm_stats', agent.model, obs, frame=env._ref_frame)
             visualizer.render('gmm_stats')
 
+        def reset_hook(env, observation):
+            visualizer.begin_draw_cycle('gmm_rollout')
+            rollout = gmm_utils.rollout(agent.model, np.hstack([observation[d] for d in agent.model.semantic_obs_dims()]), steps=600)
+            rollout = (env._robot_T_ref * rollout.T).T
+            visualizer.draw_strip('gmm_rollout', np.eye(4), 0.005, rollout)
+            visualizer.render('gmm_rollout')
+
     for ep in tqdm(range(num_episodes), desc='Evaluating Agent'):
         agent.reset()
         post_step_hooks = [] if live_plot_hook is None else [live_plot_hook]
@@ -114,7 +121,9 @@ def evaluate_agent(env, agent, num_episodes=100, max_steps=600,
             gmm_utils.draw_gmm(visualizer, 'gmm_model', agent.model, dimensions=['position', 'position|velocity'], visual_scaling=0.2, frame=env._ref_frame)
             time.sleep(0.3)
 
-        ep_return, step, info = common.run_episode(env, agent, max_steps, post_step_hook=common.post_step_hook_dispatcher(*post_step_hooks))
+        ep_return, step, info = common.run_episode(env, agent, max_steps, 
+                                                   post_step_hook=common.post_step_hook_dispatcher(*post_step_hooks),
+                                                   post_reset_hook=reset_hook)
         
         episode_returns.append(ep_return)
         episode_lengths.append(step)        

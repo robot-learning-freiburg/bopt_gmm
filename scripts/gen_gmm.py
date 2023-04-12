@@ -34,6 +34,7 @@ if __name__ == '__main__':
     parser.add_argument('--normalize',   action='store_true',        help='Normalize additional modalities to the space of positions.')
     parser.add_argument('--modalities',  default=['position'], nargs='+', help='Modalities on which to train GMM')
     parser.add_argument('--prior',       default=None, help='Prior GMM to use for initializing optimizer.')
+    parser.add_argument('--action-dim',  default=None, help='Override the velocity dimension with explicit action dimension.')
     args = parser.parse_args()
 
     if args.generator == 'seds':
@@ -48,13 +49,20 @@ if __name__ == '__main__':
                                 [np.load(t, allow_pickle=True) for t in args.trajectories], 
                                 args.modalities)
     
+    if args.action_dim is not None:
+        actions = unpack_trajectories(args.trajectories, 
+                                    [np.load(t, allow_pickle=True) for t in args.trajectories], 
+                                    [args.action_dim])
+        actions = np.vstack([data[1:] for _, _, _, data in trajs])
+    else:
+        actions = None
+
     if args.normalize and 'position' in args.modalities and len(args.modalities) > 0:
         trajs, group_norms = normalize_trajectories(trajs, 'position')
     else:
         group_norms = None
 
     trajs = [data for _, _, _, data in trajs]
-
 
     dt = 1 / args.action_freq
 
@@ -98,7 +106,12 @@ if __name__ == '__main__':
         else:
             prior_gmm = None
 
-        data = np.vstack([calculate_trajectory_velocities(t, dt) for t in trajs])
+        traj_width = trajs[0].shape[1]
+        data       = np.vstack([calculate_trajectory_velocities(t, dt) for t in trajs])
+        if actions is not None:
+            data[:,traj_width:traj_width + actions.shape[1]] = actions
+
+
         gmm  = gmm_fit_em(args.n_priors, data, 
                           max_iter=args.max_iter, 
                           tol=args.tol_cutting, 

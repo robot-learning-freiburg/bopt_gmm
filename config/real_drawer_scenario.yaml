@@ -7,5 +7,5 @@ bopt_agent:
     model: "models/gmm/real_drawer_5p.npy"
     type: position
     force_norm: 1
-  gripper_command: 0.5
+  # gripper_command: 0.0
 
