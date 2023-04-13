@@ -12,7 +12,6 @@ from skopt       import Optimizer
 from omegaconf   import ListConfig, \
                         DictConfig
 
-
 from smac        import HyperparameterOptimizationFacade, \
                         BlackBoxFacade, \
                         HyperbandFacade, \
@@ -215,10 +214,11 @@ class GMMOptAgent(object):
 class BOPTGMMAgentBase(GMMOptAgent):
     @dataclass
     class BOPTState:
-        step    : int   = 0
-        updates : int   = 0
-        reward  : float = 0.0
-        reward_samples : int = 0
+        step           : int   = 0
+        n_substep      : int   = 0
+        updates        : int   = 0
+        reward         : float = 0.0
+        reward_samples : int   = 0
     
     @dataclass
     class State:
@@ -281,17 +281,20 @@ class BOPTGMMAgentBase(GMMOptAgent):
         #                                      acq_optimizer=self.config.acq_optimizer)
         
         # SMAC
-        self._scenario = Scenario(self.config_space, n_trials=self.config.max_training_steps)
+        self._scenario = Scenario(self.config_space, 
+                                  min_budget=1,
+                                  max_budget=20,
+                                  n_trials=10)
 
 
         facade = {'hpo': HyperparameterOptimizationFacade,
                   'hb' : HyperbandFacade,
                   'bb' : BlackBoxFacade}[self.config.acq_optimizer]
         
-        # intensifier = facade.get_intensifier(
-        #     self._scenario,
-        #     max_config_calls=1,  # We basically use one seed per config only
-        # )
+        intensifier = facade.get_intensifier(
+            self._scenario,
+            max_config_calls=1,  # We basically use one seed per config only
+        )
 
         self.state.gp_optimizer = facade(self._scenario,
                                          lambda config, seed, budget : 0,
@@ -306,7 +309,7 @@ class BOPTGMMAgentBase(GMMOptAgent):
         self.state.bopt_state.reward_samples += 1
 
         # if True:
-        if self.state.bopt_state.step % min(max(int(1.0 / self.state.base_accuracy), self.config.early_tell), self.config.late_tell) == 0:
+        if self.state.bopt_state.reward_samples >= self.state.current_update.budget:
             print(f"Finished gp run {self.state.bopt_state.updates} ({self.state.bopt_state.step}). Return: {self.state.bopt_state.reward}. Let's go again!")
             self._tell(self.state.current_update, self.state.bopt_state.reward)    
             self.update_model()
@@ -318,11 +321,12 @@ class BOPTGMMAgentBase(GMMOptAgent):
 
                 super().update_model(self.state.current_update)
                 u_sigma = self.model.sigma() - self.base_model.sigma()
-                # print(f'Updated Model:\nPriors: {self.model.pi()}\nMu: {self.model.mu()}\nSigma-Delta: {u_sigma}')
+                
+                print(f'New config. New budget is: {self.state.current_update.budget}')
                 break
             except ValueError as e:
-                pass
-                # self.state.gp_optimizer.tell(self.state.current_update, 0)
+                print('Optimizer provided invalid config.')
+                self._tell(self.state.current_update, 0)
                 # self.state.bopt_state.updates += 1
         else:
             raise Exception(f'Repeated Bayesian Updates have failed to produce a valid update')

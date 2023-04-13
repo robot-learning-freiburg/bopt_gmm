@@ -12,7 +12,7 @@ acq_func: "EI"
 acq_optimizer: "auto"
 gripper_command: 0.0
 opt_dims: null
-num_training_cycles: 100
+num_training_cycles: 500
 num_episode_steps: 600
 
 gmm:
