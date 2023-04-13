@@ -7,6 +7,10 @@ open_position: 0.15 # Meters
 reference_frame: obs_shelf_top_drawer
 drawer_frame: obs_shelf_bottom_drawer
 
+handle_safe_zone:
+  min: [0.01, -0.25,-0.05]
+  max: [0.23, -0.16, 0.27]
+
 robot:
   state_prefix: /franka_state_controller
   controllers_prefix: /controllers
@@ -16,12 +20,13 @@ robot:
     - panda_finger_joint1
     - panda_finger_joint2
   initial_pose:
-    q: [-0.023170335759713712, 0.25468064101938326, 0.06394754041494409, -2.195471185424787, 0.3998670844954465, 2.6669155128659616, 1.391240276259784]  # Starting point for IK and for frequent robot reset
+    q: [-0.283470908721288, -0.01968131141239746, 0.23310846994111087, -1.8926801469315597, 0.28080483474341467, 2.057301284342939, -0.07190465905093935]  # Starting point for IK and for frequent robot reset
     gripper_width: 0.05
     position:
-      min: [0.4, -0.1, 0.3]
-      max: [0.5,  0.1, 0.45]
+      min: [0.2, -0.10, 0.25]
+      max: [0.4,  0.15, 0.45]
   joint_reset_frequency: 5  # Return the robot to the original q pose every n steps
   stiffness:
-    linear: 200
-    angular: 10
+    linear: 300
+    angular: 20
+  f_ext_limit: [12, 12, 15]

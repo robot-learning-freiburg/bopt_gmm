@@ -1,0 +1,4 @@
+model,env,noise,accuracy,date
+models/gmm/real_drawer_3p.npy,real_drawer,0.0,0.425,2023-04-12 13:29:00.000000
+models/gmm/real_drawer_5p.npy,real_drawer,0.0,0.475,2023-04-12 12:47:00.000000
+models/gmm/real_drawer_7p.npy,real_drawer,0.0,0.125,2023-04-12 13:10:00.000000

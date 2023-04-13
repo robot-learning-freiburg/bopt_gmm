@@ -93,9 +93,11 @@ class TorchAgentWrapper(object):
         return self.pseudo_bopt_step
 
 
-def run_episode(env, agent, max_steps, post_step_hook=None):
+def run_episode(env, agent, max_steps, post_step_hook=None, post_reset_hook=None):
     observation    = env.reset()
     episode_return = 0.0
+    if post_reset_hook is not None:
+        post_reset_hook(env, observation)
 
     initial_conditions = env.config_dict()
 

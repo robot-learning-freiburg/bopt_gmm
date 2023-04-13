@@ -1,6 +1,7 @@
 import cv2
 import hydra
 import numpy as np
+import time
 
 from argparse                   import ArgumentParser
 from ConfigSpace                import ConfigurationSpace
@@ -24,7 +25,8 @@ from bopt_gmm.gmm import GMM,             \
                          GMMCart3D,       \
                          GMMCart3DForce,  \
                          GMMCart3DTorque, \
-                         load_gmm
+                         load_gmm,        \
+                         utils as gmm_utils
 
 from bopt_gmm import bopt, \
                      common, \
@@ -91,6 +93,21 @@ def evaluate_agent(env, agent, num_episodes=100, max_steps=600,
 
     video_logger = None
 
+    visualizer = env._vis if hasattr(env, '_vis') else None
+
+    if visualizer is not None:
+        def live_plot_hook(step, env, agent, obs, *args):
+            visualizer.begin_draw_cycle('gmm_stats')
+            gmm_utils.draw_gmm_stats(visualizer, 'gmm_stats', agent.model, obs, frame=env._ref_frame)
+            visualizer.render('gmm_stats')
+
+        def reset_hook(env, observation):
+            visualizer.begin_draw_cycle('gmm_rollout')
+            rollout = gmm_utils.rollout(agent.model, np.hstack([observation[d] for d in agent.model.semantic_obs_dims()]), steps=600)
+            rollout = (env._robot_T_ref * rollout.T).T
+            visualizer.draw_strip('gmm_rollout', np.eye(4), 0.005, rollout)
+            visualizer.render('gmm_rollout')
+
     for ep in tqdm(range(num_episodes), desc='Evaluating Agent'):
         agent.reset()
         post_step_hooks = [] if live_plot_hook is None else [live_plot_hook]
@@ -99,7 +116,14 @@ def evaluate_agent(env, agent, num_episodes=100, max_steps=600,
             video_logger, video_hook = common.gen_video_logger_and_hook(video_dir, f'eval_{ep:04d}', env.render_size[:2])
             post_step_hooks.append(video_hook)
 
-        ep_return, step, info = common.run_episode(env, agent, max_steps, post_step_hook=common.post_step_hook_dispatcher(*post_step_hooks))
+        if visualizer is not None:
+            time.sleep(0.3)
+            gmm_utils.draw_gmm(visualizer, 'gmm_model', agent.model, dimensions=['position', 'position|velocity'], visual_scaling=0.2, frame=env._ref_frame)
+            time.sleep(0.3)
+
+        ep_return, step, info = common.run_episode(env, agent, max_steps, 
+                                                   post_step_hook=common.post_step_hook_dispatcher(*post_step_hooks),
+                                                   post_reset_hook=reset_hook)
         
         episode_returns.append(ep_return)
         episode_lengths.append(step)        
@@ -537,7 +561,7 @@ if __name__ == '__main__':
                                                max_steps=cfg.bopt_agent.num_episode_steps,
                                                logger=logger,
                                                video_dir=video_dir,
-                                               show_forces=args.show_gui,
+                                               show_forces=args.show_gui and not 'real' in cfg.env.type,
                                                verbose=1)
     
         if args.eval_out is not None:
