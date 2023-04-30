@@ -183,7 +183,7 @@ def train_sacgmm(env, cfg, num_training_cycles, max_steps,
     # We count all episodes, including the ones to fill replay
     ep_count = 0
 
-    if False:
+    if True:
         # Fill replay buffer
         obs_prior = sacgmm_env.reset()
         for _ in tqdm(range(sac_agent.warm_start_steps), desc='Filling replay buffer...'):
@@ -200,7 +200,7 @@ def train_sacgmm(env, cfg, num_training_cycles, max_steps,
                 ep_count += 1
             else:
                 obs_prior = obs_post
-    else:
+    else:  # Fake filling of replay buffer for development purposes
         obs_prior = sacgmm_env.reset()
         action    = sac_agent.get_action(obs_prior, sacgmm_config.fill_strategy)
         
@@ -283,6 +283,7 @@ if __name__ == '__main__':
     parser.add_argument('--data-dir', default=None, help='Directory to save models and data to. Will be created if non-existent')
     parser.add_argument('--ckpt-freq', default=10, type=int, help='Frequency at which to save and evaluate models')
     parser.add_argument('--eval-out', default=None, help='File to write results of evaluation to. Will write in append mode.')
+    parser.add_argument('--sac-model', default=None, help='Path to model to resume training from or to evaluate.')
     args = parser.parse_args()
 
     hydra.initialize(config_path="../config")
@@ -316,7 +317,30 @@ if __name__ == '__main__':
                      deep_eval_length=args.deep_eval,
                      ckpt_freq=args.ckpt_freq)
     elif args.mode == 'eval':
-        pass
+        if args.sac_model is None:
+            print('Need "--sac-model" argument for evaluation.')
+            exit(-1)
+
+        boptgmm_config = cfg.bopt_agent
+        sacgmm_config  = cfg.sacgmm
+
+        gmm = GMM.load_model(boptgmm_config.gmm.model)
+        gmm_agent = GMMOptAgent(gmm, boptgmm_config)
+        sac_agent, sacgmm_env = build_sacgmm(env, gmm_agent, boptgmm_config.gripper_command, sacgmm_config, None)
+
+        sac_agent.load(args.sac_model)
+
+        accuracy, ep_returns, ep_lengths = evaluate_sacgmm(sacgmm_env,
+                                                           sac_agent, 
+                                                           args.deep_eval,
+                                                           max_steps=cfg.bopt_agent.num_episode_steps, 
+                                                           ic_path=None)
+
+        if args.eval_out is not None:
+            with open(args.eval_out, 'w') as f:
+                f.write('model,gmm,env,noise,accuracy,date\n')
+                f.write(f'{args.sac_model},{cfg.bopt_agent.gmm.model},{cfg.env.type},{cfg.env.noise.position.variance},{accuracy},{datetime.now()}\n')
+
     else:
         print(f'Unknown mode "{args.mode}"')
         exit(-1)

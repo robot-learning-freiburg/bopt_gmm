@@ -147,7 +147,7 @@ class GMMOptAgent(object):
                 return self._e_cvar_params
         return dict(sum([(f'cvar_{d}_{y}_{x}', (d, y, x)) for y, x in zip(*np.tril_indices(self.base_model.n_dims))], []))
 
-    def update_model(self, parameter_update):
+    def update_model(self, parameter_update, inplace=True):
         if type(parameter_update) == TrialInfo:
             parameter_update = parameter_update.config
 
@@ -200,15 +200,25 @@ class GMMOptAgent(object):
                                                                                     len(p) // self.base_model.n_priors))
                                                               for k, p in self._e_cvar_params.items()}
         if self._complex_update_type == 'eigen':
-            self.model = self.base_model.update_gaussian(u_priors, u_mean, u_sigma, sigma_eigen_update=u_sigma_e)
+            if inplace:
+                self.model = self.base_model.update_gaussian(u_priors, u_mean, u_sigma, sigma_eigen_update=u_sigma_e)
+            else:
+                return self.base_model.update_gaussian(u_priors, u_mean, u_sigma, sigma_eigen_update=u_sigma_e)
         else:
-            self.model = self.base_model.update_gaussian(u_priors, u_mean, u_sigma, sigma_rotation=u_sigma_e)
+            if inplace:
+                self.model = self.base_model.update_gaussian(u_priors, u_mean, u_sigma, sigma_rotation=u_sigma_e)
+            else:
+                return self.base_model.update_gaussian(u_priors, u_mean, u_sigma, sigma_rotation=u_sigma_e)
 
     def reset(self):
         self.model = self.base_model
 
     def predict(self, observation):
         return self.model.predict(observation).flatten()
+
+
+def f_except(config, seed, budget):
+    raise Exception('FUUU')
 
 
 class BOPTGMMAgentBase(GMMOptAgent):
@@ -279,29 +289,42 @@ class BOPTGMMAgentBase(GMMOptAgent):
         #                                      initial_point_generator=self.config.initial_p_gen,
         #                                      acq_func=self.config.acq_func,
         #                                      acq_optimizer=self.config.acq_optimizer)
-        
+        self.reset_optimizer()
+
+    def reset_optimizer(self):
+        self.state.bopt_state.reward   = 0.0
+        self.state.bopt_state.reward_samples = 0
+
         # SMAC
         self._scenario = Scenario(self.config_space, 
-                                  min_budget=1,
+                                  min_budget=10,
                                   max_budget=20,
-                                  n_trials=10)
+                                  n_trials=self.config.max_training_steps)
 
 
         facade = {'hpo': HyperparameterOptimizationFacade,
                   'hb' : HyperbandFacade,
                   'bb' : BlackBoxFacade}[self.config.acq_optimizer]
         
-        intensifier = facade.get_intensifier(
-            self._scenario,
-            max_config_calls=1,  # We basically use one seed per config only
-        )
+        try:
+            intensifier = facade.get_intensifier(
+                self._scenario,
+                max_config_calls=1,  # We basically use one seed per config only
+            )
+        except TypeError:
+            intensifier = facade.get_intensifier(
+                self._scenario,
+                n_seeds=1,  # We basically use one seed per config only
+            )
 
         self.state.gp_optimizer = facade(self._scenario,
-                                         lambda config, seed, budget : 0,
+                                         f_except,
+                                         intensifier=intensifier,
                                          overwrite=True)
         # print(f'Base Model:\nPriors: {self.base_model.pi()}\nMu: {self.base_model.mu()}')
 
         self.update_model()
+
 
     def step_optimizer(self, reward):
         self.state.bopt_state.step   += 1
@@ -309,7 +332,8 @@ class BOPTGMMAgentBase(GMMOptAgent):
         self.state.bopt_state.reward_samples += 1
 
         # if True:
-        if self.state.bopt_state.reward_samples >= self.state.current_update.budget:
+        budget = int(self.state.current_update.budget) if self.state.current_update.budget is not None else self.config.early_tell
+        if self.state.bopt_state.reward_samples >= budget:
             print(f"Finished gp run {self.state.bopt_state.updates} ({self.state.bopt_state.step}). Return: {self.state.bopt_state.reward}. Let's go again!")
             self._tell(self.state.current_update, self.state.bopt_state.reward)    
             self.update_model()
@@ -331,8 +355,17 @@ class BOPTGMMAgentBase(GMMOptAgent):
         else:
             raise Exception(f'Repeated Bayesian Updates have failed to produce a valid update')
 
+    def incumbent_tell(self, reward, budget=None):
+        info = TrialInfo(self.get_incumbent_config(), budget=budget)
+        self._tell(info, reward)
+        self.update_model()
+
+    def force_tell(self, reward):
+        self._tell(self.state.current_update, reward)    
+        self.update_model()
+
     def _tell(self, state, reward):
-        reward = reward if self.config.reward_processor == 'raw' else reward / self.state.bopt_state.reward_samples
+        reward = reward if self.config.reward_processor == 'raw' else reward / max(1, self.state.bopt_state.reward_samples)
         # SKOPT
         # self.state.gp_optimizer.tell(state, -reward)
 
@@ -363,3 +396,14 @@ class BOPTGMMAgentBase(GMMOptAgent):
 
     def get_bopt_step(self):
         return self.state.bopt_state.updates if self.state.bopt_state is not None else 0
+
+    def get_incumbent(self):
+        opt = self.state.gp_optimizer # type: HyperbandFacade
+        incumbent = opt.intensifier.get_incumbent()
+        if incumbent is not None:
+            return super().update_model(incumbent, inplace=False)
+        return self.model
+    
+    def get_incumbent_config(self):
+        opt = self.state.gp_optimizer # type: HyperbandFacade
+        return opt.intensifier.get_incumbent()

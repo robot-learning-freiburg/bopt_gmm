@@ -107,6 +107,9 @@ def evaluate_agent(env, agent, num_episodes=100, max_steps=600,
             rollout = (env._robot_T_ref * rollout.T).T
             visualizer.draw_strip('gmm_rollout', np.eye(4), 0.005, rollout)
             visualizer.render('gmm_rollout')
+    else:
+        def reset_hook(*args):
+            pass
 
     for ep in tqdm(range(num_episodes), desc='Evaluating Agent'):
         agent.reset()
