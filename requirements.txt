@@ -1,4 +1,5 @@
 wheel
+ConfigSpace==0.6.0
 hydra.core(>=1.1.0)
 matlab(>=0.1)
 wandb(>=0.10.32)
