@@ -142,7 +142,7 @@ class SlidingDoorEnv(Env):
     def render(self, mode='rgb_array'):
         return self.render_camera.rgb()
 
-    def reset(self):
+    def reset(self, initial_conditions=None):
         # Initial state sampling is not stable
         while True:
             if self.visualizer is not None:
@@ -150,21 +150,39 @@ class SlidingDoorEnv(Env):
 
                 dbg_rel_pos = dbg_pos - self.frame.pose.position
 
-            for v in self.noise_samplers.values():
+            for n, v in self.noise_samplers.items():
                 v.reset()
+                if initial_conditions is not None:
+                    v.set_sample(np.array([initial_conditions[f'{n}_noise_x'],
+                                           initial_conditions[f'{n}_noise_y'],
+                                           initial_conditions[f'{n}_noise_z']]))
 
             self.sim.reset()
 
             position_sample = self.board_sampler.sample()
             door_position   = Point3(*position_sample[:3])
-            self.frame.pose = Transform(door_position, Quaternion.from_euler(0, np.deg2rad(0), position_sample[-1]))
+            if initial_conditions is None:
+                self.frame.pose = Transform(door_position, Quaternion.from_euler(0, np.deg2rad(0), position_sample[-1]))
+            else:
+                self.frame.pose = Transform(Point3(initial_conditions['door_pose_x'], initial_conditions['door_pose_y'], initial_conditions['door_pose_z']), 
+                                            Quaternion(initial_conditions['door_pose_qx'], 
+                                                       initial_conditions['door_pose_qy'], 
+                                                       initial_conditions['door_pose_qz'],
+                                                       initial_conditions['door_pose_qw']))
 
             self.door.pose = self.frame.pose.dot(Transform.from_xyz_rpy(0, -0.15, 0, 0, 0, np.deg2rad(180)))
 
             if self.visualizer is not None:
                 self.visualizer.set_camera_position(self.frame.pose.position + dbg_rel_pos, dbg_dist, dbg_pitch, dbg_yaw)
 
-            x_goal = Transform(Point3(*self._robot_position_sampler.sample()), self.eef.pose.quaternion)
+            if initial_conditions is None:
+                x_goal = Transform(Point3(*self._robot_position_sampler.sample()), self.eef.pose.quaternion)
+            else:
+                x_goal = Transform(Point3(initial_conditions['ee_pose_x'], initial_conditions['ee_pose_y'], initial_conditions['ee_pose_z']),
+                                   Quaternion(initial_conditions['ee_pose_qx'], 
+                                              initial_conditions['ee_pose_qy'], 
+                                              initial_conditions['ee_pose_qz'],
+                                              initial_conditions['ee_pose_qw']))
             # Only used to restore PID state after reset
             reset_controller = CartesianController(self.robot, self.eef)
 

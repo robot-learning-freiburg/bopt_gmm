@@ -1,0 +1,8 @@
+defaults:
+  - sliding_door_dbopt
+
+bopt_agent:
+  regularizer:
+    f: dot
+    b: 1
+    max_val: 0.10

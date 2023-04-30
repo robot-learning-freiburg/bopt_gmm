@@ -25,7 +25,7 @@ if __name__ == '__main__':
     try:
         metric_index = list(df.columns).index('demo_base') + 1
     except ValueError:
-        metric_index = list(df.columns).index('demo_base') + 1
+        metric_index = list(df.columns).index('base') + 1
     
     n_plots = len(df.columns) - metric_index
 

@@ -77,7 +77,7 @@ def gen_regularizer(cfg):
             return f_jsd(model_new, model_base, points) * cfg.b
     elif cfg.f == 'dot':
         def f_reg(model_new, model_base, points):
-            return np.exp(-np.abs(f_kl(model_new, model_base, points))) * cfg.b
+            return f_dot(model_new, model_base, points) * cfg.b
 
     return f_reg
 

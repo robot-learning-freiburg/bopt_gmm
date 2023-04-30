@@ -31,3 +31,12 @@ class NoiseSampler(object):
     def reset(self):
         self._noise = None
         self._noise = self.sample()
+
+    def set_sample(self, sample):
+        if type(sample) != np.ndarray:
+            raise Exception(f'Expected noise sample to be a numpy array but got {type(sample)}')
+        
+        if sample.shape != self.dim:
+            raise Exception(f'Expected noise sample to be of shape {self.dim}, but got {sample.dim}')
+        
+        self._noise = sample

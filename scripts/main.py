@@ -13,6 +13,7 @@ from omegaconf                  import OmegaConf
 from pathlib                    import Path
 from skopt                      import gp_minimize
 from tqdm                       import tqdm
+from typing                     import Any
 
 from bopt_gmm.bopt import BOPTGMMCollectAndOptAgent, \
                           BOPTGMMAgent,              \
@@ -71,7 +72,8 @@ def gen_force_logger_and_hook(force_scale=1.0):
 
 def evaluate_agent(env, agent, num_episodes=100, max_steps=600, 
                    logger=None, video_dir=None, trajectory_dir=None, 
-                   show_forces=False, verbose=0, initial_conditions_path=None):
+                   show_forces=False, verbose=0, initial_conditions_path=None,
+                   tqdm_desc='Evaluating Agent'):
     episode_returns = []
     episode_lengths = []
     
@@ -111,7 +113,7 @@ def evaluate_agent(env, agent, num_episodes=100, max_steps=600,
         def reset_hook(*args):
             pass
 
-    for ep in tqdm(range(num_episodes), desc='Evaluating Agent'):
+    for ep in tqdm(range(num_episodes), desc=tqdm_desc):
         agent.reset()
         post_step_hooks = [] if live_plot_hook is None else [live_plot_hook]
 
@@ -163,9 +165,16 @@ def evaluate_agent(env, agent, num_episodes=100, max_steps=600,
     return accuracy, episode_returns, episode_lengths
 
 
+@dataclass
+class IncumbentStats:
+    accuracy : float
+    step     : int
+    config   : Any
+
+
 def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10, 
                   opt_model_dir=None, logger=None, video_dir=None, 
-                  show_force=False, deep_eval_length=0):
+                  show_force=False, deep_eval_length=0, incumbent_eval=None):
     if logger is not None:
         logger.define_metric('bopt accuracy',   BOPT_TIME_SCALE)
         logger.define_metric('bopt reward',     BOPT_TIME_SCALE)
@@ -173,6 +182,8 @@ def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10,
         logger.define_metric('n episode',       BOPT_TIME_SCALE)
         if deep_eval_length > 0:
             logger.define_metric('bopt deep eval accuracy', BOPT_TIME_SCALE)
+        if incumbent_eval is not None:
+            logger.define_metric('bopt deep tell', BOPT_TIME_SCALE)
 
     if opt_model_dir is not None:
         fields = env.config_space
@@ -189,19 +200,32 @@ def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10,
         live_plot_hook = None
 
     n_ep = 0
+    n_incumbents = 0
+    last_incumbent_config = -1
+    
+    base_performance : IncumbentStats = None
+    best_performance : IncumbentStats = None
+    last_performance : IncumbentStats = None
+    very_best_performance : IncumbentStats = None
+
+
     for bopt_step in tqdm(range(num_episodes), desc="Training BOPT model"):
         ep_acc = common.RunAccumulator()
         
+        incumbent_config = agent.get_incumbent_config()
+        if last_incumbent_config != incumbent_config and incumbent_config is not None:
+            n_incumbents += 1
+
         # Save initial model and models every n-opts
         if opt_model_dir is not None:
             if agent.is_in_gp_stage() and bopt_step == 1:
-                agent.base_model.save_model(f'{opt_model_dir}/gmm_base.npy')
+                agent.get_incumbent().save_model(f'{opt_model_dir}/gmm_base.npy')
             
-            if bopt_step % checkpoint_freq == 0:
-                agent.model.save_model(f'{opt_model_dir}/gmm_{bopt_step}.npy')
+            if incumbent_config != last_incumbent_config:
+                agent.get_incumbent().save_model(f'{opt_model_dir}/gmm_{bopt_step}.npy')
         
         # 
-        if bopt_step % checkpoint_freq == 0 and deep_eval_length > 0:
+        if deep_eval_length > 0 and incumbent_config != last_incumbent_config:
             eval_video_dir = f'{video_dir}/eval_{bopt_step}' if video_dir is not None else None
             if eval_video_dir is not None and not Path(eval_video_dir).exists():
                 Path(eval_video_dir).mkdir(parents=True)
@@ -209,7 +233,7 @@ def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10,
             # Fix location generation
             eval_ic_path = f'{opt_model_dir}/../eval_{bopt_step}_ic.csv' if opt_model_dir is not None else None
 
-            eval_agent = common.AgentWrapper(agent.model,
+            eval_agent = common.AgentWrapper(agent.get_incumbent(),
                                              agent.config.gripper_command)
 
             e_acc, _, _ = evaluate_agent(env, eval_agent,
@@ -220,6 +244,47 @@ def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10,
                                          initial_conditions_path=eval_ic_path)
             
             logger.log({'bopt deep eval accuracy': e_acc})
+        
+        if incumbent_eval is not None and incumbent_config != last_incumbent_config:
+            eval_agent = common.AgentWrapper(agent.get_incumbent(),
+                                             agent.config.gripper_command)
+
+            e_acc, _, _ = evaluate_agent(env, eval_agent,
+                                             num_episodes=incumbent_eval.episodes,
+                                             max_steps=max_steps,
+                                             video_dir=None,
+                                             verbose=0,
+                                             initial_conditions_path=None,
+                                             tqdm_desc='Evaluating Incumbent for Tell')
+            
+            logger.log({'bopt deep tell': e_acc})
+            
+            n_ep  += incumbent_eval.episodes
+            if last_incumbent_config != -1:
+                if 1.0 - best_performance.accuracy * incumbent_eval.improvement_expectation >= e_acc:
+                    if bopt_step - best_performance.step >= incumbent_eval.new_model_every:
+                        print(f'Incumbent underperformed ({1.0 - best_performance.accuracy * incumbent_eval.improvement_expectation} >= {e_acc}) and too many steps have expired {bopt_step - best_performance.step}. Restarting...')
+                        # New model is underperforming. Resetting process
+                        agent.reset_optimizer()
+                
+                        best_performance = base_performance
+                        last_performance = best_performance
+                else:
+                    print(f'New best performance is: {e_acc}')
+                    best_performance = IncumbentStats(e_acc, bopt_step, agent.get_incumbent())
+            else:
+                print(f'Baseline performance is {e_acc}')
+                base_performance = IncumbentStats(e_acc, 0, agent.get_incumbent())
+                last_performance = base_performance
+                best_performance = base_performance
+
+            if bopt_step - last_performance.step > incumbent_eval.new_model_every:
+                print(f'Generation of new incumbent took too long. Restarting...')
+                last_performance = IncumbentStats(base_performance.accuracy, bopt_step, base_performance.config)
+                # best_performance = last_performance
+                agent.reset_optimizer()
+
+        last_incumbent_config = incumbent_config
 
         # Setup post-step hooks  
         post_step_hooks = [common.post_step_hook_bopt]
@@ -259,11 +324,24 @@ def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10,
 
     # Save final model
     if opt_model_dir is not None:
-        agent.model.save_model(f'{opt_model_dir}/gmm_final.npy')
+        best_model = best_performance.config if best_performance is not None else agent.get_incumbent()
+        best_model.config.save_model(f'{opt_model_dir}/gmm_best.npy')
+
+        eval_agent = common.AgentWrapper(best_performance.accuracy,
+                                         agent.config.gripper_command)
+
+        e_acc, _, _ = evaluate_agent(env, eval_agent,
+                                          num_episodes=incumbent_eval.episodes,
+                                          max_steps=max_steps,
+                                          video_dir=None,
+                                          verbose=0,
+                                          initial_conditions_path=None,
+                                          tqdm_desc='Evaluating Final Incumbent')
+        logger.log({'final performance': e_acc})
 
 
 def bopt_regularized_training(env, agent, reg_data, regularizer, 
-                              num_episodes, min_reg_value=0,
+                              num_episodes, max_reg_value=0.5,
                               max_steps=600, checkpoint_freq=10, 
                               opt_model_dir=None, logger=None, video_dir=None, 
                               show_force=False, deep_eval_length=0):
@@ -272,8 +350,6 @@ def bopt_regularized_training(env, agent, reg_data, regularizer,
         logger.define_metric('bopt reward',     BOPT_TIME_SCALE)
         logger.define_metric('bopt mean steps', BOPT_TIME_SCALE)
         logger.define_metric('n episode',       BOPT_TIME_SCALE)
-        logger.define_metric('bopt reg value',  BOPT_TIME_SCALE)
-        logger.define_metric('bopt ep run',     BOPT_TIME_SCALE)
         if deep_eval_length > 0:
             logger.define_metric('bopt deep eval accuracy', BOPT_TIME_SCALE)
 
@@ -292,27 +368,35 @@ def bopt_regularized_training(env, agent, reg_data, regularizer,
         live_plot_hook = None
 
     n_ep = 0
-    for n_run in tqdm(range(num_episodes), desc="Training regularized BOPT model"):
+    last_incumbent_config = -1
+    for training_step in tqdm(range(num_episodes), desc="Training BOPT model with regularization"):
+        ep_acc = common.RunAccumulator()
         
+        incumbent_config = agent.get_incumbent_config()
         # Save initial model and models every n-opts
         if opt_model_dir is not None:
-            if agent.is_in_gp_stage() and agent.get_bopt_step() == 1:
-                agent.base_model.save_model(f'{opt_model_dir}/gmm_base.npy')
+            if agent.is_in_gp_stage() and training_step == 1:
+                agent.get_incumbent().save_model(f'{opt_model_dir}/gmm_base.npy')
             
-            if n_run % checkpoint_freq == 0:
-                agent.model.save_model(f'{opt_model_dir}/gmm_{n_run}.npy')
+            if incumbent_config != last_incumbent_config:
+                agent.get_incumbent().save_model(f'{opt_model_dir}/gmm_{training_step}.npy')
         
         # 
-        if n_run > 0 and n_run % checkpoint_freq == 0 and deep_eval_length > 0:
-            # Fix location generation
-            eval_ic_path = f'{opt_model_dir}/../eval_{n_run}_ic.csv' if opt_model_dir is not None else None
+        if deep_eval_length > 0 and incumbent_config != last_incumbent_config:
+            eval_video_dir = f'{video_dir}/eval_{training_step}' if video_dir is not None else None
+            if eval_video_dir is not None and not Path(eval_video_dir).exists():
+                Path(eval_video_dir).mkdir(parents=True)
 
-            eval_agent = common.AgentWrapper(agent.model,
+            # Fix location generation
+            eval_ic_path = f'{opt_model_dir}/../eval_{training_step}_ic.csv' if opt_model_dir is not None else None
+
+            eval_agent = common.AgentWrapper(agent.get_incumbent(),
                                              agent.config.gripper_command)
 
             e_acc, _, _ = evaluate_agent(env, eval_agent,
                                          num_episodes=deep_eval_length,
                                          max_steps=max_steps,
+                                         video_dir=eval_video_dir,
                                          verbose=0,
                                          initial_conditions_path=eval_ic_path)
             
@@ -321,39 +405,48 @@ def bopt_regularized_training(env, agent, reg_data, regularizer,
         for tries in range(1000):
             reg_val = regularizer(agent.model, agent.base_model, reg_data)
             logger.log({'bopt reg value' : reg_val})
-            if min_reg_value <= reg_val:
+            if reg_val <= max_reg_value:
                 break
             
-            reward = (1 - reg_val) * -100
+            print(f'Regularization value: {reg_val}')
+            reward = 0 # reg_val * -100
             # Log reg value as reward when it is used to update the model
             logger.log({'bopt reward' : reward,
                         'bopt ep run' : 0})
-            agent.step_optimizer(reward)
+            agent.force_tell(reward)
         else:
             raise Exception(f'Failed to generate a feasible update complying with regularization in {tries} attempts')
 
+        last_incumbent_config = incumbent_config
+
         # Setup post-step hooks  
-        post_step_hooks = []  # common.post_step_hook_bopt]
+        post_step_hooks = [common.post_step_hook_bopt]
+        if live_plot_hook is not None:
+            post_step_hooks.append(live_plot_hook)
+
+        if video_dir is not None:
+            video_logger, video_hook = common.gen_video_logger_and_hook(video_dir, f'bopt_{training_step:04d}', env.render_size[:2])
+            post_step_hooks.append(video_hook)
 
         # Collecting data for next BOPT update
-        ep_acc = common.RunAccumulator()
-        for _ in range(agent.config.early_tell):
-            n_ep += 1
+        sub_ep_idx = 0
+        initial_bopt_step = agent.get_bopt_step()
+        while agent.get_bopt_step() == initial_bopt_step:
             ep_return, step, info = common.run_episode(env, agent, max_steps, post_step_hook=common.post_step_hook_dispatcher(*post_step_hooks))
             ep_acc.log_run(step + 1, ep_return, info['success'])
             if ic_logger is not None:
                 ic = info['initial_conditions']
-                ic.update({BOPT_TIME_SCALE: agent.get_bopt_step(), 
-                           'substep'  : 1, 
-                           'steps'    : step + 1, 
-                           'success'  : info['success']})
-            ic_logger.log(ic)
+                ic.update({BOPT_TIME_SCALE: training_step, 
+                           'substep': sub_ep_idx, 
+                           'steps' : step + 1, 
+                           'success': info['success']})
+                ic_logger.log(ic)
+            sub_ep_idx += 1
+            n_ep += 1
 
-        agent.step_optimizer(ep_acc.get_stats()[1] / ep_acc._runs)
-
-        # if video_dir is not None:
-        #     _, _, bopt_accuracy = ep_acc.get_stats()
-        #     video_logger.rename(f'bopt_{bopt_step:04d}_{bopt_accuracy:1.3f}')
+        if video_dir is not None:
+            _, _, bopt_accuracy = ep_acc.get_stats()
+            video_logger.rename(f'bopt_{training_step:04d}_{bopt_accuracy:1.3f}')
 
         # Log results of execution from this step
         if logger is not None:
@@ -361,12 +454,11 @@ def bopt_regularized_training(env, agent, reg_data, regularizer,
             logger.log({'bopt mean steps': bopt_mean_steps,
                         'bopt reward'    : bopt_reward, 
                         'bopt accuracy'  : bopt_accuracy,
-                        'n episode'      : n_ep,
-                        'bopt ep run'    : 1})
+                        'n episode'      : n_ep})
 
     # Save final model
     if opt_model_dir is not None:
-        agent.model.save_model(f'{opt_model_dir}/gmm_final.npy')
+        agent.get_incumbent().save_model(f'{opt_model_dir}/gmm_final.npy')
 
 
 
@@ -472,11 +564,12 @@ def main_bopt_agent(env, bopt_agent_config, conf_hash,
                       opt_model_dir=model_dir, logger=logger, 
                       video_dir=video_dir, show_force=show_force,
                       checkpoint_freq=ckpt_freq,
-                      deep_eval_length=deep_eval_length)
+                      deep_eval_length=deep_eval_length,
+                      incumbent_eval=bopt_agent_config.incumbent_eval)
     else:
         regularizer = reg.gen_regularizer(bopt_agent_config.regularizer)
         bopt_regularized_training(env, agent, np.vstack(trajectories), regularizer, 
-                                  min_reg_value=bopt_agent_config.regularizer.min_val,
+                                  max_reg_value=bopt_agent_config.regularizer.max_val,
                                   num_episodes=bopt_agent_config.num_training_cycles, 
                                   max_steps=bopt_agent_config.num_episode_steps, 
                                   opt_model_dir=model_dir, logger=logger, 

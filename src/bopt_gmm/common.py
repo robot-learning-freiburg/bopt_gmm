@@ -53,6 +53,9 @@ class AgentWrapper(object):
     def get_bopt_step(self):
         self.pseudo_bopt_step += 1
         return self.pseudo_bopt_step
+    
+    def get_incumbent(self):
+        return self.model
 
 
 class TorchAgentWrapper(object):
@@ -93,8 +96,8 @@ class TorchAgentWrapper(object):
         return self.pseudo_bopt_step
 
 
-def run_episode(env, agent, max_steps, post_step_hook=None, post_reset_hook=None):
-    observation    = env.reset()
+def run_episode(env, agent, max_steps, post_step_hook=None, post_reset_hook=None, initial_conditions=None):
+    observation    = env.reset(initial_conditions)
     episode_return = 0.0
     if post_reset_hook is not None:
         post_reset_hook(env, observation)

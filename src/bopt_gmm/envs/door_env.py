@@ -132,7 +132,10 @@ class DoorEnv(Env):
     def render(self, mode='rgb_array'):
         return self.render_camera.rgb()
 
-    def reset(self):
+    def reset(self, initial_conditions=None):
+        if initial_conditions is not None:
+            raise NotImplementedError
+
         if self.visualizer is not None:
             dbg_pos, dbg_dist, dbg_pitch, dbg_yaw = self.visualizer.get_camera_position()
 

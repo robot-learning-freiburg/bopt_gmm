@@ -29,7 +29,13 @@ if __name__ == '__main__':
         print(f'Dataframe is missing a "base" column')
         exit(-1)
     
-    bases = {b: GMM.load_model(b) for b in set(df.base)}
+    bases = {} 
+    for b in set(df.base):
+        try:
+            bases[b] = GMM.load_model(b)
+        except Exception:
+            pass
+
     demo_bases = None
     if 'demo_base' in df:
         demo_bases = {b: GMM.load_model(b) for b in set(df.demo_base)}
@@ -37,15 +43,23 @@ if __name__ == '__main__':
     trajectories = {}
     for p_traj in args.trajectories:
         p_traj = Path(p_traj)
-        noise  = int(regex.findall(r"_n\d\d_", str(p_traj.name))[0][2:-1]) * 0.01
-        components = int(regex.findall(r"_\d+p_", str(p_traj.name))[0][1:-2])
+        noise  = 0.0  # int(regex.findall(r"_n\d\d_", str(p_traj.name))[0][2:-1]) * 0.01
+        components = 3 # int(regex.findall(r"_\d+p_", str(p_traj.name))[0][1:-2])
 
         if components not in trajectories:
             trajectories[components] = {}
         
         trajectories[components][noise] = np.vstack([pos for _, _, _, pos in unpack_trajectories([p_traj], 
                                                                                                  [np.load(p_traj, allow_pickle=True)], 
-                                                                                                 ['position', 'force'])])
+                                                                                                 ['position'])])
+        
+        # Hacking the range of noises
+        for n in range(0, 6):
+            trajectories[components][n * 0.01] = trajectories[components][0.0]
+    
+    # Hacking the range of components
+    trajectories[5] = trajectories[components]
+    trajectories[7] = trajectories[components]
 
 
     f_regs = [reg.f_joint_prob, reg.f_mean_prob, reg.f_kl, reg.f_jsd, reg.f_dot]
@@ -68,6 +82,10 @@ if __name__ == '__main__':
     values = []
     for c, n, m, b, db in tqdm(data, desc='Calculating regularizations...'):
         gmm = GMM.load_model(m)
+        
+        if b not in bases:
+            continue
+
         base_gmm = bases[b]
         positions = trajectories[c][n]
 
