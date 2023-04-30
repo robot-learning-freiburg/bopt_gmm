@@ -11,16 +11,18 @@ replay_buffer_size: 100000
 replay_buffer_path: null
 optimize_alpha: true
 
-sacgmm_steps: 30
-episode_steps: 600
+sacgmm_steps: 30      # Number of control steps per SACGMM step
+episode_steps: 600    # Maximum number of control steps
 
-observations: null
+observations: null    # Environment observations to pass to SACGMM
 
+# Actor architecture
 actor:
   hidden_layers: 2
   hidden_dim: 256
   init_w: 0.001
 
+# Critic architecture
 critic:
   hidden_layers: 2
   hidden_dim: 256

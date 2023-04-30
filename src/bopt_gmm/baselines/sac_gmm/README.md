@@ -1,0 +1,8 @@
+# SACGMM
+
+This subpackage implements the SACGMM approach. The general structure of the package is rather simple: `actor.py` and `critic.py` implement the actor and critic networks for SAC, `replay_buffer.py` holds a typical replay buffer implementation.
+All of these components are put together in the `agent.py` file, which holds the `SACAgent` class, which implements the SAC algortihm. This SAC implementation is agnostic of the problem it is being applied to, thus does not create the actor or critic networks. The agent implements both the training procedure and multiple options for inference.
+
+This implementation of SAC-GMM is meant to be deployable on a real system, thus it is built under the assumption, that it has no control over the time step of the environment. Consequently, the agent does not offer any fully automatic training interface. Instead, the `env.py` contains an environment wrapper which presents a view of an existing control environment as a SACGMM environment (aka one SACGMM step envelopes multiple control steps). The `SACGMM` environment takes an existing environment and a `GMMOptAgent` (an agent that can process updates to an internal GMM) and wraps them up such that the observation of the environment is the observation of the original environment, but the action space is the update space of the `GMMOptAgent`. One call of `step()` on this wrapper takes a GMM update and then runs the GMM-agent's inference for multiple steps before reporting back the final observation of the underlying environment.
+
+For an example of using these systems, please check `scripts/sacgmm_main.py`. In particular, check `build_sacgmm` as an example of building a full SACGMM setup for an environment.
