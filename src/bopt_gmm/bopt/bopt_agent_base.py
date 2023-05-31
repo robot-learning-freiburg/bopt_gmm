@@ -54,6 +54,8 @@ class BOPTAgentConfig(GMMOptConfig):
     acq_optimizer    : str   = 'auto'
     gripper_command  : float = 0.5
     max_training_steps : int = 100
+    budget_min       : int = 5
+    budget_max       : int = 10
 
 
 class GMMOptAgent(object):
@@ -281,9 +283,10 @@ class BOPTGMMAgentBase(GMMOptAgent):
 
         # SMAC
         self._scenario = Scenario(self.config_space, 
-                                  min_budget=10,
-                                  max_budget=20,
-                                  n_trials=self.config.max_training_steps)
+                                  min_budget=self.config.budget_min,
+                                  max_budget=self.config.budget_max,
+                                  deterministic=False,
+                                  n_trials=5)
 
 
         facade = {'hpo': HyperparameterOptimizationFacade,

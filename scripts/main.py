@@ -3,6 +3,8 @@ import hydra
 import numpy as np
 import time
 
+import random
+
 from argparse                   import ArgumentParser
 from ConfigSpace                import ConfigurationSpace
 from ConfigSpace                import UniformFloatHyperparameter
@@ -53,6 +55,7 @@ from bopt_gmm.logging import WBLogger, \
 from bopt_gmm.envs import PegEnv,   \
                           DoorEnv,  \
                           ENV_TYPES
+
 
 
 def gen_force_logger_and_hook(force_scale=1.0):
@@ -524,6 +527,8 @@ def main_bopt_agent(env, bopt_agent_config, conf_hash,
                                        acq_optimizer=bopt_agent_config.acq_optimizer,
                                        gripper_command=bopt_agent_config.gripper_command,
                                        delta_t=env.dt,
+                                       budget_min=bopt_agent_config.budget_min,
+                                       budget_max=bopt_agent_config.budget_max,
                                        f_gen_gmm=gmm_generator,
                                        debug_data_path=f'{model_dir}/{bopt_agent_config.debug_data_path}',
                                        debug_gmm_path=f'{model_dir}/{bopt_agent_config.debug_gmm_path}')
@@ -544,7 +549,9 @@ def main_bopt_agent(env, bopt_agent_config, conf_hash,
                                     gripper_command=bopt_agent_config.gripper_command,
                                     base_accuracy=bopt_agent_config.base_accuracy,
                                     opt_dims=bopt_agent_config.opt_dims,
-                                    max_training_steps=bopt_agent_config.num_training_cycles)
+                                    max_training_steps=bopt_agent_config.num_training_cycles,
+                                    budget_min=bopt_agent_config.budget_min,
+                                    budget_max=bopt_agent_config.budget_max)
 
         if bopt_agent_config.gmm.type in {'force', 'torque'}:
             # Not used anymore as observation processing is now done by the GMM
