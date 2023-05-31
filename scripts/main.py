@@ -597,7 +597,13 @@ if __name__ == '__main__':
     parser.add_argument('--ckpt-freq', default=10, type=int, help='Frequency at which to save and evaluate models')
     parser.add_argument('--eval-out', default=None, help='File to write results of evaluation to. Will write in append mode.')
     parser.add_argument('--bc-inputs', default=['position'], nargs='+', help='Observations to feed to BC policy.')
+    parser.add_argument('--seed', default=None, type=int, help='Fixes the seed of numpy and random.')
     args = parser.parse_args()
+
+    if args.seed is not None:
+        random.seed(args.seed)
+        np.random.seed(args.seed)
+
 
     # Point hydra to the root of your config dir. Here it's hard-coded, but you can also
     # use "MY_MODULE.__path__" to localize it relative to your python package
