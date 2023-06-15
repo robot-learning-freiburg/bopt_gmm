@@ -13,9 +13,9 @@ try:
 except ModuleNotFoundError: # Just don't load this if we don't have the panda lib present
     Panda = None
 
-from iai_bullet_sim import Point3,            \
-                           Vector3,           \
-                           AABB
+from prime_bullet import Point3,            \
+                         Vector3,           \
+                         AABB
 
 from multiprocessing import RLock
 

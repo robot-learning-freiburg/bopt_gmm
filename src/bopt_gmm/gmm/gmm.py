@@ -10,7 +10,7 @@ from random      import random
 from scipy.stats import multivariate_normal
 from typing      import Union
 
-from iai_bullet_sim import Quaternion
+from prime_bullet import Quaternion
 
 from .utils import isPD, nearestPD
 

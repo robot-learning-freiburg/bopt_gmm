@@ -7,9 +7,9 @@ import threading
 
 from datetime import datetime
 from aiohttp import web
-from iai_bullet_sim import Vector3, \
-                           res_pkg_path, \
-                           DebugVisualizer
+from prime_bullet import Vector3, \
+                         res_pkg_path, \
+                         DebugVisualizer
 from omegaconf import ListConfig
 
 from bopt_gmm.utils import save_demo_npz

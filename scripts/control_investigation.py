@@ -4,7 +4,7 @@ import roboticstoolbox as rp
 import spatialmath     as sm
 import tf2_ros
 
-from iai_bullet_sim    import AABB, \
+from prime_bullet      import AABB, \
                               Point3, \
                               Vector3, \
                               Quaternion

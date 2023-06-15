@@ -2,22 +2,22 @@ import numpy as np
 
 from functools   import lru_cache
 
-from iai_bullet_sim import BasicSimulator,    \
-                           MultiBody,         \
-                           Link,              \
-                           PerspectiveCamera, \
-                           Transform,         \
-                           Point3,            \
-                           Vector3,           \
-                           Quaternion,        \
-                           Frame,             \
-                           AABB,              \
-                           MeshBody,          \
-                           CartesianController, \
-                           CartesianRelativePointController, \
-                           CartesianRelativeVirtualPointController, \
-                           CartesianRelativeVPointCOrientationController, \
-                           CartesianRelativePointCOrientationController
+from prime_bullet import Simulator,         \
+                         MultiBody,         \
+                         Link,              \
+                         PerspectiveCamera, \
+                         Transform,         \
+                         Point3,            \
+                         Vector3,           \
+                         Quaternion,        \
+                         Frame,             \
+                         AABB,              \
+                         MeshBody,          \
+                         CartesianController, \
+                         CartesianRelativePointController, \
+                         CartesianRelativeVirtualPointController, \
+                         CartesianRelativeVPointCOrientationController, \
+                         CartesianRelativePointCOrientationController
 
 
 from gym.spaces import Box  as BoxSpace, \
@@ -30,7 +30,7 @@ from .utils     import BoxSampler, \
 
 class SlidingDoorEnv(Env):
     def __init__(self, cfg, show_gui=False):
-        self.sim = BasicSimulator(cfg.action_frequency, use_egl=not show_gui)
+        self.sim = Simulator(cfg.action_frequency, use_egl=not show_gui)
         self.sim.init('gui' if show_gui else 'direct')
 
         self.dt        = 1 / cfg.action_frequency
