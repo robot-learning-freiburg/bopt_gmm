@@ -2,6 +2,7 @@ import cv2
 import hydra
 import numpy as np
 import torch
+import random
 
 from argparse      import ArgumentParser
 from ConfigSpace   import ConfigurationSpace
@@ -284,7 +285,13 @@ if __name__ == '__main__':
     parser.add_argument('--ckpt-freq', default=10, type=int, help='Frequency at which to save and evaluate models')
     parser.add_argument('--eval-out', default=None, help='File to write results of evaluation to. Will write in append mode.')
     parser.add_argument('--sac-model', default=None, help='Path to model to resume training from or to evaluate.')
+    parser.add_argument('--seed', default=None, type=int, help='Fixes the seed of numpy, torch, and random.')
     args = parser.parse_args()
+
+    if args.seed is not None:
+        random.seed(args.seed)
+        np.random.seed(args.seed)
+        torch.manual_seed(args.seed)
 
     hydra.initialize(config_path="../config")
     cfg = hydra.compose(args.hy, overrides=args.overrides)

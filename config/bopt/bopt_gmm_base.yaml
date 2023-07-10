@@ -11,6 +11,8 @@ n_initial_points: 10
 acq_func: "EI"
 acq_optimizer: "hpo"
 gripper_command: 0.0
+budget_min: 5
+budget_max: 10
 opt_dims: null
 num_training_cycles: 50
 num_episode_steps: 600

@@ -54,6 +54,8 @@ class BOPTAgentConfig(GMMOptConfig):
     acq_optimizer    : str   = 'auto'
     gripper_command  : float = 0.5
     max_training_steps : int = 100
+    budget_min       : int = 5
+    budget_max       : int = 10
 
 
 class GMMOptAgent(object):
@@ -273,22 +275,6 @@ class BOPTGMMAgentBase(GMMOptAgent):
         self.state.bopt_state    = BOPTGMMAgentBase.BOPTState()
         self.state.base_accuracy = base_accuracy if base_accuracy is not None else len(self.state.success_trajectories) / len(self.state.trajectories)
 
-        # optim_params = []
-        # if self.config.prior_range != 0.0:
-        #     optim_params += [(-self.config.prior_range, self.config.prior_range)] * self.base_model.n_priors
-        # if self.config.mean_range != 0.0:
-        #     optim_params += [(-self.config.mean_range, self.config.mean_range)] * self.base_model.n_priors * self.base_model.n_dims
-        # if self.config.sigma_range != 0.0:
-        #     optim_params += [(-self.config.sigma_range, self.config.sigma_range)] * (len(self.base_model.state_dim) * len(self.base_model.prediction_dim) * self.base_model.n_priors)
-        #     self._cvar_indices = list(zip(*product(range(self.base_model.n_priors), self.base_model.state_dim, self.base_model.prediction_dim)))
-
-        # SKOPT OPTIMIZER
-        # self.state.gp_optimizer  = Optimizer(optim_params,
-        #                                      base_estimator=self.config.base_estimator,
-        #                                      n_initial_points=self.config.n_initial_points,
-        #                                      initial_point_generator=self.config.initial_p_gen,
-        #                                      acq_func=self.config.acq_func,
-        #                                      acq_optimizer=self.config.acq_optimizer)
         self.reset_optimizer()
 
     def reset_optimizer(self):
@@ -297,9 +283,10 @@ class BOPTGMMAgentBase(GMMOptAgent):
 
         # SMAC
         self._scenario = Scenario(self.config_space, 
-                                  min_budget=3,
-                                  max_budget=10,
-                                  n_trials=self.config.max_training_steps)
+                                  min_budget=self.config.budget_min,
+                                  max_budget=self.config.budget_max,
+                                  deterministic=False,
+                                  n_trials=5)
 
 
         facade = {'hpo': HyperparameterOptimizationFacade,
