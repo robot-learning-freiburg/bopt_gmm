@@ -34,6 +34,9 @@ def sim_loop(env, sim_state, save_dir):
     if vis is None:
         raise Exception('Teleop can only performed with a visualizer')
 
+    if hasattr(env, 'home'):
+        env.home()
+
     observations = []
     actions      = []
     while not sim_state.should_shutdown:

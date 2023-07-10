@@ -297,8 +297,8 @@ class BOPTGMMAgentBase(GMMOptAgent):
 
         # SMAC
         self._scenario = Scenario(self.config_space, 
-                                  min_budget=10,
-                                  max_budget=20,
+                                  min_budget=3,
+                                  max_budget=10,
                                   n_trials=self.config.max_training_steps)
 
 

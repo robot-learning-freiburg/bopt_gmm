@@ -171,7 +171,7 @@ def draw_gmm_stats(vis, namespace, gmm, observation, frame=None):
 
     activations = np.nan_to_num(activations / activations.sum()).flatten()
 
-    print(activations)
+    # print(activations)
 
     vis.begin_draw_cycle(f'{namespace}/stats')
     for mu_k in [gmm.mu(v) for k, v in gmm.semantic_obs_dims().items() if len(v) == 3]:

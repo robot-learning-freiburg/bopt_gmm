@@ -28,10 +28,9 @@ if __name__ == '__main__':
     robot = env._robot  # type: Panda
 
     while not rospy.is_shutdown():
-        robot.start_handguiding(0, 10)
         uinput = input('IS ROBOT FREE? (y/n): ')
         if uinput.lower() == 'y':
-            robot.cm.activate_controller('position_joint_trajectory_controller')
+            # robot.cm.activate_controller('position_joint_trajectory_controller')
             rospy.sleep(0.1)
             env.reset()
             print('ENVIRONMENT IS RESET')
