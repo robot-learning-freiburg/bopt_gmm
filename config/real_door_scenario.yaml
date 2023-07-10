@@ -1,0 +1,11 @@
+defaults:
+  - env: real_door
+  - bopt@bopt_agent: bopt_gmm_base
+
+bopt_agent:
+  gmm: 
+    model: "models/gmm/real_door_5p.npy"
+    type: position
+    force_norm: 1
+  # gripper_command: 0.0
+

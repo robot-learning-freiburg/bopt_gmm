@@ -1,0 +1,8 @@
+<launch>
+    <include file="$(find fmm)/launch/fmm_tower_aruco_detector.launch">
+        <arg name="marker_size" value="0.07"/>
+        <arg name="marker_dict" value="DICT_4X4_50"/>
+        <arg name="aliases" value="{obs_door_frame: 22, obs_door: 23}"/>
+    </include>
+    <node name="tower_camera_control" pkg="fmm" type="fmm_set_camera.bash" args="-0.6 -0.2 5"/>
+</launch>

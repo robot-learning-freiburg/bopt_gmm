@@ -13,9 +13,10 @@ try:
 except ModuleNotFoundError: # Just don't load this if we don't have the panda lib present
     Panda = None
 
-from prime_bullet import Point3,            \
-                         Vector3,           \
-                         AABB
+from iai_bullet_sim import Point3,            \
+                           Vector3,           \
+                           Quaternion,        \
+                           AABB
 
 from multiprocessing import RLock
 
@@ -30,21 +31,21 @@ from geometry_msgs.msg import WrenchStamped as WrenchStampedMsg
 from std_msgs.msg      import Float64       as Float64Msg
 
 
-VCONTROL_CLAMP = 0.05
+VCONTROL_CLAMP = 0.06
 
 class TotalRobotFailure(Exception):
     pass
 
 
-class RealDrawerEnv(Env):
+class RealDoorEnv(Env):
     def __init__(self, cfg, show_gui=False):
-        rospy.init_node('bopt_gmm_real_drawer')
+        rospy.init_node('bopt_gmm_real_door')
 
         # Only used for IK
         self._ik_model = rp.models.Panda()
 
-        self.workspace = AABB(Point3(-0.4, -0.4, 0), 
-                              Point3( 0.4,  0.4, 0.7))
+        self.workspace = AABB(Point3(-0.6, -0.3, -0.6), 
+                              Point3( 0.0,  0.5,  0.0))
 
         self.tfBuffer = tf2_ros.Buffer()
         self.listener = tf2_ros.TransformListener(self.tfBuffer)
@@ -57,15 +58,15 @@ class RealDrawerEnv(Env):
 
         self._ref_frame    = cfg.reference_frame
         self._drawer_frame = cfg.drawer_frame
-        self._target_position  = cfg.open_position
-        self._handle_safe_zone = AABB(Point3(*cfg.handle_safe_zone.min), 
-                                      Point3(*cfg.handle_safe_zone.max))
+        self._target_rotation    = cfg.open_angle
+        self._handle_safe_height = cfg.handle_safe_height
+        self._handle_safe_delta  = cfg.handle_safe_delta
         self._f_ext_limit  = np.asarray(cfg.robot.f_ext_limit)
 
         self._robot_T_ref         = None
         self._ref_T_robot         = None
         self._current_drawer_pose = None
-        self._ref_P_drawer        = None
+        self._ref_R_door        = None
 
         self._robot_frame = cfg.robot.reference_frame
         self._ee_frame    = cfg.robot.endeffector_frame
@@ -110,9 +111,10 @@ class RealDrawerEnv(Env):
         try:
             tf_stamped = self.tfBuffer.lookup_transform(self._ref_frame, self._drawer_frame, rospy.Time(0))
             
-            self._ref_P_drawer = Point3(tf_stamped.transform.translation.x, 
-                                        tf_stamped.transform.translation.y, 
-                                        tf_stamped.transform.translation.z)
+            self._ref_R_door = Quaternion(tf_stamped.transform.rotation.x, 
+                                          tf_stamped.transform.rotation.y, 
+                                          tf_stamped.transform.rotation.z,
+                                          tf_stamped.transform.rotation.w)
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
             pass
 
@@ -167,6 +169,17 @@ class RealDrawerEnv(Env):
         q1_threshold = -1 * q[0]**6 - 0.45
         return q[1] < q1_threshold
 
+    def home(self):
+        rospy.sleep(0.3)
+        for tries in range(5):
+            try:
+                self._robot.move_joint_position(self._arm_reset_pose, 0.15)
+                break
+            except RobotUnresponsiveException:
+                print(f'Robot is not moving. Trying again {tries}')
+        else:
+            raise TotalRobotFailure('Robot does not move.')
+
     def reset(self, initial_conditions=None):
         if initial_conditions is not None:
             raise NotImplementedError
@@ -193,19 +206,21 @@ class RealDrawerEnv(Env):
         print('Bla')
         self._robot.cm.recover_error_state()
         while True:
-            if self._ref_P_drawer is None:
-                print('Waiting for drawer to be registered')
+            if self._ref_R_door is None:
+                print('Waiting for door to be registered')
             else:
                 ref_T_ee_goal = self._ref_T_robot * self._robot.state.O_T_EE
 
-                if self._handle_safe_zone.inside(ref_T_ee_goal[:3, 3]):
+                if np.abs(self._handle_safe_height - ref_T_ee_goal[2, 3]) > self._handle_safe_delta:
                     robot_T_ee_goal = self._robot.state.O_T_EE * 1
-                    robot_T_ee_goal[2, 3] += 0.02
+                    robot_T_ee_goal[2, 3] += 0.02 * np.sign(self._handle_safe_height - ref_T_ee_goal[2, 3])
                     self._robot.async_move_ee_cart_absolute(robot_T_ee_goal)
+                    # print('bot')
                 else:
-                    if self._ref_P_drawer.z <= 0.015:
+                    angle = self._calculate_door_angle()
+                    if angle <= 0.05:
                         break
-                    print(f'Waiting for drawer position to be less than 0.015. Currently: {self._ref_P_drawer.z}')
+                    print(f'Waiting for door angle to be less than 0.02. Currently: {angle}')
 
             rospy.sleep(0.3)
 
@@ -217,16 +232,7 @@ class RealDrawerEnv(Env):
         print('Bla3')
         # Reset joint space position every couple of episodes
         if self._n_reset % self._joint_reset_every == 0:
-            rospy.sleep(0.3)
-            for tries in range(5):
-                try:
-                    self._robot.move_joint_position(self._arm_reset_pose, 0.15)
-                    break
-                except RobotUnresponsiveException:
-                    print(f'Robot is not moving. Trying again {tries}')
-            else:
-                raise TotalRobotFailure('Robot does not move.')
-
+            self.home()
 
         print('Bla4')
         while True:
@@ -256,7 +262,7 @@ class RealDrawerEnv(Env):
         else:
             raise TotalRobotFailure('Robot does not move.')
 
-        self._robot.set_gripper_position(0.0)
+        self._robot.set_gripper_position(0.08)
 
         self.ref_P_v_goal = self._robot.state.O_T_EE[:3, 3].flatten()
 
@@ -309,7 +315,7 @@ class RealDrawerEnv(Env):
             self._vis.draw_poses('action', np.eye(4), 0.1, 0.003, [robot_T_ee_goal])
             self._vis.render('action')
 
-        # print(f'Action: {action}\nCurrent EE: {self._robot.state.O_T_EE}\nGoal EE: {robot_T_ee_goal}')
+        print(f'Action: {action}\nCurrent EE: {self._robot.state.O_T_EE}\nGoal EE: {robot_T_ee_goal}')
         
         self._robot.async_move_ee_cart_absolute(robot_T_ee_goal)
 
@@ -365,6 +371,7 @@ class RealDrawerEnv(Env):
         if self._robot.state.ext_force is not None:
             force_violation = max(np.abs(self._robot.state.ext_force) > self._f_ext_limit)
             if force_violation:
+                print(f'External force violation: {np.abs(self._robot.state.ext_force)} > {self._f_ext_limit}')
                 return True, False
 
         # try:
@@ -385,11 +392,19 @@ class RealDrawerEnv(Env):
         # print(peg_pos_in_target)
 
         # Horizontal goal, vertical goal
-        if self._ref_P_drawer is not None and self._ref_P_drawer.z >= self._target_position:
-            print('Terminated due to drawer being open')
-            return True, True
+        if self._ref_R_door is not None:
+            angle = self._calculate_door_angle() 
+            if angle >= self._target_rotation:
+                print(f'Terminated due to door being open (angle: {angle})')
+                return True, True
 
         return False, False
+
+    def _calculate_door_angle(self):
+        while self._ref_R_door is None:
+            pass
+
+        return np.arccos((self._ref_R_door.dot(-Vector3.unit_x()) * Vector3(1, 1, 0)).normalized().y) 
 
     def _set_gripper_absolute_goal(self, target):
         self.robot.apply_joint_pos_cmds({j.name: self.robot.joints[j.name].q_max * target for j in self.gripper_joints}, [800]*2)
