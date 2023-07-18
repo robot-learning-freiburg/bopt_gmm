@@ -43,8 +43,8 @@ class PegEnv(Env):
 
         self.table = self.sim.create_box(Vector3(0.6, 1, 0.05), Transform.from_xyz(0.5, 0, -0.025), color=(1, 1, 1, 1), mass=0)
         self.board = self.sim.load_urdf(cfg.board.path, useFixedBase=True)
-        self.peg   = self.robot.links['peg'] #
-        # self.peg   = self.sim.load_urdf(cfg.peg.path)
+        # self.peg   = self.robot.links['peg'] #
+        self.peg   = self.sim.load_urdf(cfg.peg.path)
 
         if self.sim.visualizer is not None:
             self.sim.visualizer.set_camera_position(self.target_position, 0.6, -25, 65)
@@ -63,8 +63,8 @@ class PegEnv(Env):
         self.eef_ft_sensor = self.robot.get_ft_sensor(cfg.robot.ft_joint)
 
         peg_position = self.eef.pose.position - Vector3(0, 0, 0.02)
-        # self.peg.initial_pose = Transform.from_xyz(*peg_position)
-        # self.peg.pose         = self.peg.initial_pose
+        self.peg.initial_pose = Transform.from_xyz(*peg_position)
+        self.peg.pose         = self.peg.initial_pose
 
         self.noise_samplers = {k: NoiseSampler(s.shape, 
                                                cfg.noise[k].variance, 
@@ -76,6 +76,20 @@ class PegEnv(Env):
         self.controller     = CartesianRelativeVPointCOrientationController(self.robot, self.eef, 0.02)
 
         self._elapsed_steps = 0
+
+    @property
+    def config_space(self):
+        return sum([[f'{k}_noise_{x}' for x in 'xyz'] for k in self.noise_samplers.keys()], []) + \
+                    [f'board_pose_{x}' for x in 'x,y,z,qx,qy,qz,qw'.split(',')] + \
+                    [f'ee_pose_{x}' for x in 'x,y,z,qx,qy,qz,qw'.split(',')]
+
+    def config_dict(self):
+        out = {} 
+        for k, n in self.noise_samplers.items(): 
+            out.update(dict(zip([f'{k}_noise_{x}' for x in 'xyz'], n.sample())))
+        out.update(dict(zip([f'board_pose_{x}' for x in 'x,y,z,qx,qy,qz,qw'.split(',')], self.board.pose.array())))
+        out.update(dict(zip([f'ee_pose_{x}' for x in 'x,y,z,qx,qy,qz,qw'.split(',')], self.eef.pose.array())))
+        return out
 
     @property
     def visualizer(self):
@@ -99,7 +113,10 @@ class PegEnv(Env):
                           'gripper': BoxSpace(-1, 1, shape=(1,))})
 
 
-    def reset(self):
+    def reset(self, initial_conditions=None):
+        if initial_conditions is not None:
+            raise NotImplementedError
+
         if self.visualizer is not None:
             dbg_pos, dbg_dist, dbg_pitch, dbg_yaw = self.visualizer.get_camera_position()
 
@@ -186,7 +203,7 @@ class PegEnv(Env):
 
         # Horizontal goal, vertical goal
         if (peg_pos_in_target * Vector3(1, 1, 0)).norm() < 0.005 and \
-            peg_pos_in_target.z <= 0.005:
+            peg_pos_in_target.z <= 0.01:
             return True, True
         elif (self.eef.pose.position - self.peg.pose.position).norm() > 0.25: # Peg was dropped
             return True, False
@@ -197,5 +214,4 @@ class PegEnv(Env):
         return self.board.links['target'].pose.position
 
     def _set_gripper_relative_goal(self, delta):
-        return 
         self.robot.apply_joint_pos_cmds({j.name: self.robot.joint_state[j.name].position + delta for j in self.gripper_joints}, [800]*2)

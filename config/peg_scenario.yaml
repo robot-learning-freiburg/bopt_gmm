@@ -4,9 +4,9 @@ defaults:
 
 bopt_agent:
   gmm: 
-    # model: "models/gmm/peg_3p.npy"
+    model: "models/gmm/peg_3p.npy"
     # model: "models/gmm/peg_n_f_3p.npy"
-    model: "models/gmm/peg_sawyer_3p.npy"
+    # model: "models/gmm/peg_sawyer_3p.npy"
     # model: "models/GMM/gmm_iai_peg_3_100.npy"
     # model: peg_force_model_3_600.npy
     # model: last_model_293524.09639436525.npy
@@ -16,6 +16,3 @@ bopt_agent:
     force_norm: 1
   gripper_command: -1.0
 
-env:
-  observation:
-    with_noise: False

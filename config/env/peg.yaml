@@ -17,13 +17,13 @@ noise:
     constant: true
 
 robot:
-  # path: package://bopt_gmm/robots/panda_hand.urdf
-  path: package://bopt_gmm/robots/panda_peg.urdf
+  path: package://bopt_gmm/robots/panda_hand.urdf
+  # path: package://bopt_gmm/robots/panda_peg.urdf
   eef: panda_hand_tcp
   ft_joint: panda_hand_joint
-  fingers: []
-    # - panda_finger_joint1
-    # - panda_finger_joint2
+  fingers:
+    - panda_finger_joint1
+    - panda_finger_joint2
   initial_pose:
     q: [0, -0.3, 0, -2.2, 0, 2.0, 0.7853981633974483]  # only used for IK
     position: [0.35, 0, 0.30]

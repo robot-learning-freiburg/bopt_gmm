@@ -1,5 +1,5 @@
 defaults:
-  - door_scenario
+  - peg_scenario
 
 teleoperate:
   lin_input_mapping: [[0, 0, 1],
