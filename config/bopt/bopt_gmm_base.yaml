@@ -13,6 +13,7 @@ acq_optimizer: "hpo"
 gripper_command: 0.0
 budget_min: 5
 budget_max: 10
+n_trials: 10
 opt_dims: null
 num_training_cycles: 50
 num_episode_steps: 600

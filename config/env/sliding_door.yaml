@@ -11,8 +11,8 @@ frame:
   path: package://bopt_gmm/objects/hatch_frame.urdf
   reference_link: base_link
   sampler:
-    min: [0.3, -0.2, 0.04, -0.2]
-    max: [0.4,  0.2, 0.04,  0.2]
+    min: [0.3, -0.1, 0.04, -0.0]
+    max: [0.35,  0.1, 0.04,  0.0]
 
 noise:
   position:
@@ -30,7 +30,7 @@ robot:
     q: [0, -0.2, 0.0, -2.5, 1.6, 2.6, 0.7853981633974483, 0]  # only used for IK
     orientation: [-3.145, 0, 1.57]
     position:
-      min: [0.40, -0.25, 0.05]
-      max: [0.50,  0.25, 0.35]
+      min: [0.35, -0.05, 0.3]
+      max: [0.45,  0.05, 0.35]
     gripper_width: 0.05
   controller: relative   # Options: relative, virtual

@@ -1,0 +1,19 @@
+defaults:
+  - sliding_door_scenario
+  - em@bopt_agent.gmm_generator: em_3_priors
+  - override bopt@bopt_agent: bopt_gmm_force
+
+bopt_agent:
+  gmm_generator:
+    type: em
+    modalities: [position, force]
+    model: <class 'bopt_gmm.gmm.instances.GMMCart3DForce'>
+    debug_data_path: bopt_gmm_trajectories # Prefix for saving the successful trajectories used to train the GMM
+  debug_gmm_path: bopt_gmm_model         # Prefix for saving the newly generated gmm
+  base_accuracy: 0.65
+  mean_range:  0.0
+  sigma_range: 0.4
+  opt_dims:
+    type: rotation
+    means: null
+    cvars: null

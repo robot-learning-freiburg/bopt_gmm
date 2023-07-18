@@ -6,3 +6,11 @@ defaults:
 bopt_agent:
   gmm_generator:
     type: em
+    modalities: [position, force]
+    model: <class 'bopt_gmm.gmm.instances.GMMCart3DForce'>
+    debug_data_path: bopt_gmm_trajectories # Prefix for saving the successful trajectories used to train the GMM
+  debug_gmm_path: bopt_gmm_model         # Prefix for saving the newly generated gmm
+  base_accuracy: 0.65
+  opt_dims:
+    means: null
+    cvars: null

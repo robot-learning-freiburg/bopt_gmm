@@ -21,6 +21,11 @@ def add_gmm_model(cls, name=None):
     name = str(cls) if name is None else name
     GMM_MODEL_REGISTRY[name] = cls
 
+def get_gmm_model(name):
+    if name in GMM_MODEL_REGISTRY:
+        return GMM_MODEL_REGISTRY[name]
+    raise KeyError(f'Unknown GMM type "{name}". Options are: {list(GMM_MODEL_REGISTRY.keys())}')
+
 
 class GMM(object):
     def __init__(self, priors: Union[int, np.array]=None, means: Union[int, np.array]=None, cvar: np.array=None, general_scale=1.0):

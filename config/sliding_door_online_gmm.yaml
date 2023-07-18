@@ -1,0 +1,7 @@
+defaults:
+  - sliding_door_scenario
+  - override bopt@bopt_agent: online_gmm
+
+bopt_agent:
+  debug_gmm_path: online_gmm_model         # Prefix for saving the newly generated gmm
+  data_path: demos_sliding_door/demo_*.npz

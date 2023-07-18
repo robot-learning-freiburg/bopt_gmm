@@ -1,4 +1,8 @@
 tol_cutting: 0.05
 max_iter: 600
 tol: 0.05
-n_init: 1
+n_init: 20
+type: em
+modalities: null
+model: null
+normalize: True

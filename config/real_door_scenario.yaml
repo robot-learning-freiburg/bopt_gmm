@@ -4,8 +4,9 @@ defaults:
 
 bopt_agent:
   gmm: 
-    model: "models/gmm/real_door_5p.npy"
+    model: "models/gmm/real_door_7p.npy"
     type: position
     force_norm: 1
   # gripper_command: 0.0
+  num_episode_steps: 1000
 

@@ -214,7 +214,7 @@ def train_sacgmm(env, cfg, num_training_cycles, max_steps,
         ic = sacgmm_env.config_dict()
 
     # Add Logging callback post initialization
-    total_eps = num_training_cycles * cfg.bopt_agent.early_tell
+    total_eps = num_training_cycles
     opt_steps = 0
 
     pbar = tqdm(total=total_eps) # Initialise

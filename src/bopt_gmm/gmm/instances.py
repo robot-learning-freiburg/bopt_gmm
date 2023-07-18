@@ -53,7 +53,12 @@ class GMMCart3D(GMM):
     def semantic_obs_dims(self):
         return OrderedDict([('position', self.state_dim[:3])])
 
+    @classmethod
+    def model_kwargs_from_groups(cls, group_norms, modalities):
+        return {}
+
 add_gmm_model(GMMCart3D)
+
 
 class GMMCart3DJS(GMM):
     def __init__(self, priors, means, cvar, dim_names=[], general_scale=1.0):
@@ -123,6 +128,12 @@ class GMMCart3DJS(GMM):
         for x, d in enumerate(self._dim_names):
             out[d] = (x + len(self.state_dim) - len(self._dim_names),)
         return out
+
+    @classmethod
+    def model_kwargs_from_groups(cls, group_norms, modalities):
+        if group_norms is None:
+            return {}
+        return {'dim_names' : sorted([m for m in modalities if m != 'position'])}
 
 add_gmm_model(GMMCart3DJS)
 
@@ -212,6 +223,12 @@ class GMMCart3DForce(GMM):
         return OrderedDict([('position', self.state_dim[:3]),
                             ('force', self.state_dim[3:])])
 
+    @classmethod
+    def model_kwargs_from_groups(cls, group_norms, modalities):
+        if group_norms is None:
+            return {}
+        return {'force_scale': group_norms['force']}
+
 add_gmm_model(GMMCart3DForce)
 
 
@@ -234,6 +251,12 @@ class GMMCart3DTorque(GMMCart3DForce):
                             ('torque', self.state_dim[3:]), 
                             ('velocity', self.prediction_dim[:3]),
                             ('torque_vel', self.prediction_dim[3:])])
+
+    @classmethod
+    def model_kwargs_from_groups(cls, group_norms, modalities):
+        if group_norms is None:
+            return {}
+        return {'force_scale': group_norms['torque']}
 
 add_gmm_model(GMMCart3DTorque)
 

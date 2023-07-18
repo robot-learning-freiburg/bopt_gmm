@@ -56,6 +56,7 @@ class BOPTAgentConfig(GMMOptConfig):
     max_training_steps : int = 100
     budget_min       : int = 5
     budget_max       : int = 10
+    n_trials         : int = 50
 
 
 class GMMOptAgent(object):
@@ -64,7 +65,7 @@ class GMMOptAgent(object):
         self.config     = config
         self.model      = gmm
         self._e_cvar_params = None
-        self._complex_update_type = 'eigen'
+        self._complex_update_type = 'rotation' # 'eigen'
 
     @property
     @lru_cache(1)
@@ -263,7 +264,7 @@ class BOPTGMMAgentBase(GMMOptAgent):
         self.state.trajectories[-1].append(transition)
         if self.config.f_success(*transition):
             self.state.success_trajectories.append(self.state.trajectories[-1])
-            # print(f'Collected a successful trajectory. Now got {len(self.state.success_trajectories)}')
+            print(f'Collected a successful trajectory. Now got {len(self.state.success_trajectories)}')
         if done:
             self.state.trajectories.append([])
             
@@ -285,8 +286,9 @@ class BOPTGMMAgentBase(GMMOptAgent):
         self._scenario = Scenario(self.config_space, 
                                   min_budget=self.config.budget_min,
                                   max_budget=self.config.budget_max,
-                                  deterministic=False,
-                                  n_trials=5)
+                                  deterministic=True,
+                                  use_default_config=True,
+                                  n_trials=self.config.n_trials)
 
 
         facade = {'hpo': HyperparameterOptimizationFacade,
@@ -309,6 +311,7 @@ class BOPTGMMAgentBase(GMMOptAgent):
                                          intensifier=intensifier,
                                          overwrite=True)
         # print(f'Base Model:\nPriors: {self.base_model.pi()}\nMu: {self.base_model.mu()}')
+        # self._tell(TrialInfo(self._scenario.configspace.get_default_configuration(), seed=0), 0.5)
 
         self.update_model()
 
@@ -336,7 +339,7 @@ class BOPTGMMAgentBase(GMMOptAgent):
                 print(f'New config. New budget is: {self.state.current_update.budget}')
                 break
             except ValueError as e:
-                print('Optimizer provided invalid config.')
+                print(f'Optimizer provided invalid config: {e}')
                 self._tell(self.state.current_update, 0)
                 # self.state.bopt_state.updates += 1
         else:
@@ -355,6 +358,7 @@ class BOPTGMMAgentBase(GMMOptAgent):
         reward = reward if self.config.reward_processor == 'raw' else reward / max(1, self.state.bopt_state.reward_samples)
         # SKOPT
         # self.state.gp_optimizer.tell(state, -reward)
+        print(f'Seed of state: {state.seed}')
 
         reward = 100 - reward
 
@@ -386,11 +390,14 @@ class BOPTGMMAgentBase(GMMOptAgent):
 
     def get_incumbent(self):
         opt = self.state.gp_optimizer # type: HyperbandFacade
-        incumbent = opt.intensifier.get_incumbent()
-        if incumbent is not None:
-            return super().update_model(incumbent, inplace=False)
+        if opt is not None:
+            incumbent = opt.intensifier.get_incumbent()
+            if incumbent is not None:
+                return super().update_model(incumbent, inplace=False)
         return self.model
     
     def get_incumbent_config(self):
         opt = self.state.gp_optimizer # type: HyperbandFacade
-        return opt.intensifier.get_incumbent()
+        if opt is not None:
+            return opt.intensifier.get_incumbent()
+        return self.model

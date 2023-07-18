@@ -11,7 +11,9 @@ else:
 
 from bopt_gmm.gmm   import GMM
 from bopt_gmm.utils import unpack_transition_traj, \
-                           calculate_trajectory_velocities
+                           calculate_trajectory_velocities, \
+                           normalize_trajectories
+                           
 
 
 def gmm_fit_em(n_components, points, gmm_type=GMM, max_iter=100, tol=0.01, n_init=1, prior_gmm=None, model_kwargs={}):
@@ -43,27 +45,22 @@ def gmm_fit_em(n_components, points, gmm_type=GMM, max_iter=100, tol=0.01, n_ini
         return gmm_type(bgmm.priors, bgmm.means, bgmm.covariances, **model_kwargs)
 
 
-def em_gmm_generator(gmm_type, n_priors, max_iter, tol, n_init, data_order=['position', 'force', 'torque']):
-    def em_generator(transitions, delta_t):
-        trajs = [unpack_transition_traj(t) for t in transitions]
+def em_gmm_generator(gmm_type, n_priors, max_iter, 
+                     tol, n_init, modalities, normalize=True):
+    def em_generator(transitions, delta_t, prior=None):
+        trajs = [unpack_transition_traj(t, modalities) for t in transitions]
 
-        fields, groups, _ = trajs[0]
-        group_prefixes = [fields[g[0]][:fields[g[0]].rfind('_')] for g in groups]
-
-        ldo = data_order
-        if ldo is None:
-            group_order = list(range(len(group_prefixes)))
+        if normalize:
+            trajs, group_norms = normalize_trajectories(trajs, 'position')
         else:
-            ldo  = [d for d in ldo if d in group_prefixes]
-            group_order = [group_prefixes.index(d) for d in ldo]
-        
-        data_points = []
+            group_norms = None
 
-        for _, groups, data in trajs:
-            ordered_data = np.hstack([np.take(data, groups[go], axis=1) for go in group_order])
-            data_points.append(calculate_trajectory_velocities(ordered_data, delta_t))
+        model_kwargs = gmm_type.model_kwargs_from_groups(group_norms, modalities)
 
-        data_points = np.vstack(data_points)
-        return gmm_fit_em(n_priors, data_points, gmm_type, max_iter, tol, n_init)
+        trajs = [data for _, _, _, data in trajs]
+        data  = np.vstack([calculate_trajectory_velocities(t, delta_t) for t in trajs])
+
+        return gmm_fit_em(n_priors, data, gmm_type, 
+                          max_iter, tol, n_init, prior, model_kwargs)
     
     return em_generator

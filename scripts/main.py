@@ -21,6 +21,8 @@ from bopt_gmm.bopt import BOPTGMMCollectAndOptAgent, \
                           BOPTGMMAgent,              \
                           BOPTAgentGMMConfig,        \
                           BOPTAgentGenGMMConfig,     \
+                          OnlineGMMAgent,            \
+                          OnlineGMMConfig,           \
                           BOPT_TIME_SCALE
 import bopt_gmm.bopt.regularization as reg
                           
@@ -29,6 +31,7 @@ from bopt_gmm.gmm import GMM,             \
                          GMMCart3DForce,  \
                          GMMCart3DTorque, \
                          load_gmm,        \
+                         get_gmm_model,   \
                          utils as gmm_utils
 
 from bopt_gmm import bopt, \
@@ -224,11 +227,11 @@ def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10,
             if agent.is_in_gp_stage() and bopt_step == 1:
                 agent.get_incumbent().save_model(f'{opt_model_dir}/gmm_base.npy')
             
-            if incumbent_config != last_incumbent_config:
+            if incumbent_config != last_incumbent_config and n_incumbents % checkpoint_freq == 0:
                 agent.get_incumbent().save_model(f'{opt_model_dir}/gmm_{bopt_step}.npy')
         
         # 
-        if deep_eval_length > 0 and incumbent_config != last_incumbent_config:
+        if deep_eval_length > 0 and incumbent_config != last_incumbent_config and n_incumbents % checkpoint_freq == 0:
             eval_video_dir = f'{video_dir}/eval_{bopt_step}' if video_dir is not None else None
             if eval_video_dir is not None and not Path(eval_video_dir).exists():
                 Path(eval_video_dir).mkdir(parents=True)
@@ -328,18 +331,19 @@ def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10,
     # Save final model
     if opt_model_dir is not None:
         best_model = best_performance.config if best_performance is not None else agent.get_incumbent()
-        best_model.config.save_model(f'{opt_model_dir}/gmm_best.npy')
+        best_model.save_model(f'{opt_model_dir}/gmm_best.npy')
 
-        eval_agent = common.AgentWrapper(best_performance.accuracy,
+        eval_agent = common.AgentWrapper(best_model,
                                          agent.config.gripper_command)
 
         e_acc, _, _ = evaluate_agent(env, eval_agent,
-                                          num_episodes=incumbent_eval.episodes,
+                                          num_episodes=max(deep_eval_length, 20),
                                           max_steps=max_steps,
                                           video_dir=None,
                                           verbose=0,
                                           initial_conditions_path=None,
                                           tqdm_desc='Evaluating Final Incumbent')
+        print(f'Final performance: {e_acc}')
         logger.log({'final performance': e_acc})
 
 
@@ -470,7 +474,7 @@ def main_bopt_agent(env, bopt_agent_config, conf_hash,
                     data_dir=None, render_video=False, deep_eval_length=0,
                     trajectories=None, ckpt_freq=10):
 
-    if bopt_agent_config.agent not in {'bopt-gmm', 'dbopt'}:
+    if bopt_agent_config.agent not in {'bopt-gmm', 'dbopt', 'online'}:
         raise Exception(f'Unkown agent type "{bopt_agent_config.agent}"')
     
     model_dir = f'{data_dir}/models' if data_dir is not None else None
@@ -493,47 +497,78 @@ def main_bopt_agent(env, bopt_agent_config, conf_hash,
     if 'var_adjustment' in bopt_agent_config.gmm and bopt_agent_config.gmm.var_adjustment != 0:
         base_gmm = base_gmm.update_gaussian(sigma=np.stack([np.eye(base_gmm.n_dims) * bopt_agent_config.gmm.var_adjustment]*base_gmm.n_priors, axis=0))
 
-    if bopt_agent_config.agent == 'bopt-gmm':
+    if bopt_agent_config.agent in {'bopt-gmm', 'online'}:
+        n_priors   = base_gmm.n_priors            if bopt_agent_config.agent == 'online' else None
+        gmm_type   = type(base_gmm)               if bopt_agent_config.agent == 'online' else None
+        modalities = base_gmm.semantic_obs_dims() if bopt_agent_config.agent == 'online' else None
+
         if bopt_agent_config.gmm_generator.type == 'seds':
             seds_config = bopt_agent_config.gmm_generator
 
             gmm_generator = seds_gmm_generator(seds_config.seds_path,
-                                               GMMCart3DForce,
-                                               seds_config.n_priors,
+                                               GMMCart3DForce if gmm_type is None else gmm_type,
+                                               seds_config.n_priors if n_priors is None else n_priors,
                                                seds_config.objective,
                                                seds_config.tol_cutting,
                                                seds_config.max_iter)
         elif bopt_agent_config.gmm_generator.type == 'em':
             em_config     = bopt_agent_config.gmm_generator
-            gmm_generator = em_gmm_generator(GMMCart3DForce,
-                                             em_config.n_priors,
+            gmm_generator = em_gmm_generator(get_gmm_model(em_config.model) if gmm_type is None else gmm_type,
+                                             em_config.n_priors if n_priors is None else n_priors,
                                              em_config.max_iter,
                                              em_config.tol,
-                                             em_config.n_init)
+                                             em_config.n_init,
+                                             em_config.modalities if modalities is None else modalities,
+                                             em_config.normalize)
         else:
             raise Exception(f'Unknown GMM generator "{bopt_agent_config.gmm_generator}"')
 
-        config = BOPTAgentGenGMMConfig(prior_range=bopt_agent_config.prior_range,
-                                       mean_range=bopt_agent_config.mean_range,
-                                       sigma_range=bopt_agent_config.sigma_range,
-                                       early_tell=bopt_agent_config.early_tell,
-                                       late_tell=bopt_agent_config.late_tell,
-                                       reward_processor=bopt_agent_config.reward_processor,
-                                       n_successes=bopt_agent_config.n_successes,
-                                       base_estimator=bopt_agent_config.base_estimator,
-                                       initial_p_gen=bopt_agent_config.initial_p_gen,
-                                       n_initial_points=bopt_agent_config.n_initial_points,
-                                       acq_func=bopt_agent_config.acq_func,
-                                       acq_optimizer=bopt_agent_config.acq_optimizer,
-                                       gripper_command=bopt_agent_config.gripper_command,
-                                       delta_t=env.dt,
-                                       budget_min=bopt_agent_config.budget_min,
-                                       budget_max=bopt_agent_config.budget_max,
-                                       f_gen_gmm=gmm_generator,
-                                       debug_data_path=f'{model_dir}/{bopt_agent_config.debug_data_path}',
-                                       debug_gmm_path=f'{model_dir}/{bopt_agent_config.debug_gmm_path}')
+        if bopt_agent_config.agent == 'bopt-gmm':
+            config = BOPTAgentGenGMMConfig(prior_range=bopt_agent_config.prior_range,
+                                           mean_range=bopt_agent_config.mean_range,
+                                           sigma_range=bopt_agent_config.sigma_range,
+                                           early_tell=bopt_agent_config.early_tell,
+                                           late_tell=bopt_agent_config.late_tell,
+                                           reward_processor=bopt_agent_config.reward_processor,
+                                           n_successes=bopt_agent_config.n_successes,
+                                           base_estimator=bopt_agent_config.base_estimator,
+                                           initial_p_gen=bopt_agent_config.initial_p_gen,
+                                           n_initial_points=bopt_agent_config.n_initial_points,
+                                           acq_func=bopt_agent_config.acq_func,
+                                           acq_optimizer=bopt_agent_config.acq_optimizer,
+                                           gripper_command=bopt_agent_config.gripper_command,
+                                           delta_t=env.dt,
+                                           budget_min=bopt_agent_config.budget_min,
+                                           budget_max=bopt_agent_config.budget_max,
+                                           n_trials=bopt_agent_config.n_trials,
+                                           f_gen_gmm=gmm_generator,
+                                           debug_data_path=f'{model_dir}/{bopt_agent_config.debug_data_path}',
+                                           debug_gmm_path=f'{model_dir}/{bopt_agent_config.debug_gmm_path}')
 
-        agent  = BOPTGMMCollectAndOptAgent(base_gmm, config, logger=logger)
+            agent  = BOPTGMMCollectAndOptAgent(base_gmm, config, logger=logger)
+        else:
+            data_paths = list(Path(bopt_agent_config.data_path).parent.glob(Path(bopt_agent_config.data_path).name))
+            trajectories = unpack_trajectories(data_paths, [np.load(t, allow_pickle=True) for t in data_paths],
+                                               base_gmm.semantic_obs_dims())
+
+            transition_trajs = []
+            for _, dim_names, groups, data in trajectories:
+                group_names = [dim_names[g[0]].split('_')[0] for g in groups]
+                transitions = []
+
+                for x, row in enumerate(data):
+                    obs  = {gn: np.take(row, g) for g, gn in zip(groups, group_names)}
+                    done = x == data.shape[0] - 1
+                    transitions.append((obs, None, done * 100, done, None))
+                
+                transition_trajs.append(transitions)
+
+            config = OnlineGMMConfig(original_data=transition_trajs,
+                                     delta_t=env.dt,
+                                     f_gen_gmm=gmm_generator,
+                                     debug_gmm_path=f'{model_dir}/{bopt_agent_config.debug_gmm_path}',
+                                     gripper_command=bopt_agent_config.gripper_command)
+            agent = OnlineGMMAgent(base_gmm, config, logger=logger)
     elif bopt_agent_config.agent == 'dbopt':
         config = BOPTAgentGMMConfig(prior_range=bopt_agent_config.prior_range,
                                     mean_range=bopt_agent_config.mean_range,
@@ -551,7 +586,8 @@ def main_bopt_agent(env, bopt_agent_config, conf_hash,
                                     opt_dims=bopt_agent_config.opt_dims,
                                     max_training_steps=bopt_agent_config.num_training_cycles,
                                     budget_min=bopt_agent_config.budget_min,
-                                    budget_max=bopt_agent_config.budget_max)
+                                    budget_max=bopt_agent_config.budget_max,
+                                    n_trials=bopt_agent_config.n_trials)
 
         if bopt_agent_config.gmm.type in {'force', 'torque'}:
             # Not used anymore as observation processing is now done by the GMM
@@ -673,6 +709,9 @@ if __name__ == '__main__':
                                                show_forces=args.show_gui and not 'real' in cfg.env.type,
                                                verbose=1)
     
+        # Restore the position of a real robot
+        env.reset()
+
         if args.eval_out is not None:
             with open(args.eval_out, 'w') as f:
                 f.write('model,env,noise,accuracy,date\n')

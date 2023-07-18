@@ -1,0 +1,16 @@
+defaults:
+  - real_door_scenario
+  - override bopt@bopt_agent: bopt_gmm_dbopt
+
+bopt_agent:
+  base_accuracy: 0.65
+  mean_range:  0.0
+  sigma_range: 0.4
+  num_episode_steps: 1000
+  opt_dims:
+    means: null
+    cvars:
+      type: rotation
+      unary: null
+      nary:  null
+

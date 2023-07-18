@@ -1,0 +1,15 @@
+<launch>
+    <include file="$(find realsense2_camera)/launch/rs_camera.launch"/>
+    <include file="$(find rl_franka)/launch/franka_control.launch"/>
+
+    <node name="joy"  pkg="joy" type="joy_node"/>
+
+    <node name="aruco_publisher"  pkg="another_aruco" type="marker_detector" output="screen">
+        <remap from="/camera_info" to="/camera/color/camera_info"/>
+        <remap from="/image_rect"  to="/camera/color/image_raw"/>
+        <remap from="~detections"  to="~observations"/>
+        <param name="marker_size" type="double"  value="0.07"/>
+        <param name="marker_dict" type="string" value="DICT_4X4_50"/>
+        <param name="id_aliases" type="yaml" value="{obs_door_frame: 22, obs_door: 23}"/>
+    </node>
+</launch>

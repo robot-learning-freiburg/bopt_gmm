@@ -2,30 +2,32 @@ type: real_door
 
 action_frequency: 30
 
-open_angle: 0.5 # Radians
+open_angle: 0.4 # Radians
 
-reference_frame: obs_door_frame
-drawer_frame: obs_door
+reference_frame: panda_link0
+door_frame: obs_door
+door_measurement_frame: obs_door_frame
 
-handle_safe_height: -0.27
+handle_safe_height: 0.35
 handle_safe_delta: 0.01
 
 robot:
   state_prefix: /franka_state_controller
   controllers_prefix: /controllers
   reference_frame: panda_link0
-  endeffector_frame: panda_EE
+  endeffector_frame: panda_link8
+
   fingers: 
     - panda_finger_joint1
     - panda_finger_joint2
   initial_pose:
-    q: [-0.8387939298299092, -0.17189840160091963, 0.520909440985897, -2.43823535882381, 2.6116176732950462, 2.2731604212655068, -0.3115268092949434]  # Starting point for IK and for frequent robot reset
+    q: [-0.020128424041196656, -0.472276300484674, 0.17956246357043829, -2.5826434897686763, 1.714088937969333, 3.3030420469045634, -2.4632187721501624]  # Starting point for IK and for frequent robot reset
     gripper_width: 0.05
     position:
-      min: [-0.5, -0.10, -0.15]
-      max: [-0.2,  0.15, -0.1]
+      min: [0.45, -0.05, 0.37]
+      max: [0.52,  0.05, 0.44]
   joint_reset_frequency: 5  # Return the robot to the original q pose every n steps
   stiffness:
-    linear: 300
+    linear: 600
     angular: 20
   f_ext_limit: [12, 12, 35]

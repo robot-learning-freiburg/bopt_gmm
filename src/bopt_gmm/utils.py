@@ -143,6 +143,9 @@ def unpack_trajectories(file_paths, traj_files, white_list=None):
                 trajs.append((f'{fp} {x}', ) + unpack_transition_traj(t, white_list))
     return trajs
 
+def restore_transition_trajectory():
+    pass
+
 
 def gauss_smoothing(o_series, steps):
     if len(o_series.shape) < 2:
@@ -169,6 +172,9 @@ def gauss_smoothing(o_series, steps):
 
 
 def normalize_trajectories(trajectories, norm_group : str):
+    if len(trajectories[0]) < 4:
+        trajectories = [('', ) + tt for tt in trajectories]
+
     fp, dim_names, groups, data = trajectories[0]
     for dx, dn in enumerate(dim_names):
         if dn[:len(norm_group)] == norm_group:
@@ -196,7 +202,7 @@ def normalize_trajectories(trajectories, norm_group : str):
 
     out = []
     for fp, dim_names, groups, data in trajectories:
-        out_data = np.hstack(np.take(data, g, axis=1) * gf for g, gf in zip(groups, group_factors))
+        out_data = np.hstack([np.take(data, g, axis=1) * gf for g, gf in zip(groups, group_factors)])
         out.append((fp, dim_names, groups, out_data))
 
     return out, dict(zip(group_names, group_factors))

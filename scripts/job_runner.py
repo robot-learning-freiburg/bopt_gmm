@@ -17,7 +17,10 @@ if __name__ == '__main__':
     for a in args:
         if Path(a).exists() and Path(a).is_file():
             with open(a, 'r') as f:
-                jobs.extend(f.readlines())
+                for l in f.readlines():
+                    l = l.strip()
+                    if len(l) > 0 and l[0] != '#':
+                        jobs.append(l)
         else:
             jobs.append(a)
 

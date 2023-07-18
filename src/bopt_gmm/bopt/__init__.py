@@ -8,4 +8,6 @@ from .bopt_agent_direct_bopt import BOPTGMMAgent, \
 
 from .bopt_agent_collect_online import BOPTGMMCollectAndOptAgent, \
                                        BOPTAgentGenGMMConfig
-                                       
+
+from .online_gmm import OnlineGMMAgent, \
+                        OnlineGMMConfig

@@ -31,7 +31,7 @@ if __name__ == '__main__':
         args.out = f'{args.out}.npz'
 
 
-    device = torch.device('cuda:0') if torch.has_cuda else torch.cuda.device('cpu')
+    device = torch.device('cuda') if torch.has_cuda else torch.cuda.device('cpu')
 
     trajs = unpack_trajectories(args.trajectories, 
                                 [np.load(t, allow_pickle=True) for t in args.trajectories], 

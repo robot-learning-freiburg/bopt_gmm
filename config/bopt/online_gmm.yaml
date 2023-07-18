@@ -1,0 +1,27 @@
+agent:  online
+gripper_command: 0.0
+n_trials: 10
+num_training_cycles: 50
+num_episode_steps: 600
+data_path: ???
+incumbent_eval:
+  eval_after: 1000
+  episodes: 20
+  new_model_every: 10
+  improvement_expectation: 0.65
+
+gmm:
+  model: ???
+  type:  ???
+  force_norm: ???
+  var_adjustment: 0  # Value added to the variances of the GMM to avoid numerical issues
+
+gmm_generator:
+  type: em
+  modalities: null  # is determined by base model
+  model: null       # is determined by base model
+  normalize: True   # Always better to have
+  tol_cutting: 0.05
+  tol: 0.05
+  max_iter: 600
+  n_init: 1         # Since we always initialize with the base model, we don't need multiple inits
