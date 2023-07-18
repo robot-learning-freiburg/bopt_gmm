@@ -315,6 +315,8 @@ def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10,
                 ic_logger.log(ic)
             sub_ep_idx += 1
             n_ep += 1
+            if n_ep >= 500:
+                break
 
         if video_dir is not None:
             _, _, bopt_accuracy = ep_acc.get_stats()
@@ -327,6 +329,9 @@ def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10,
                         'bopt reward'    : bopt_reward, 
                         'bopt accuracy'  : bopt_accuracy,
                         'n episode'      : n_ep})
+
+        if n_ep >= 500:
+            break
 
     # Save final model
     if opt_model_dir is not None:
