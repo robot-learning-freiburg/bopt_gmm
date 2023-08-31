@@ -314,8 +314,13 @@ def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10,
                            'success': info['success']})
                 ic_logger.log(ic)
             sub_ep_idx += 1
+
             n_ep += 1
             if n_ep >= 500:
+                break
+
+            if sub_ep_idx > 40:
+                n_ep = 500
                 break
 
         if video_dir is not None:
