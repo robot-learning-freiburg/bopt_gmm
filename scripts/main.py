@@ -55,9 +55,7 @@ from bopt_gmm.logging import WBLogger, \
                              MP4VideoLogger, \
                              CSVLogger
 
-from bopt_gmm.envs import PegEnv,   \
-                          DoorEnv,  \
-                          ENV_TYPES
+from rl_tasks import ENV_TYPES
 
 
 
@@ -112,8 +110,7 @@ def evaluate_agent(env, agent, num_episodes=100, max_steps=600,
         def reset_hook(env, observation):
             visualizer.begin_draw_cycle('gmm_rollout')
             rollout = gmm_utils.rollout(agent.model, np.hstack([observation[d] for d in agent.model.semantic_obs_dims()]), steps=600)
-            rollout = (env._robot_T_ref * rollout.T).T
-            visualizer.draw_strip('gmm_rollout', np.eye(4), 0.005, rollout)
+            visualizer.draw_strip('gmm_rollout', env._robot_T_ref, 0.005, rollout)
             visualizer.render('gmm_rollout')
     else:
         def reset_hook(*args):
@@ -192,13 +189,19 @@ def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10,
             logger.define_metric('bopt deep tell', BOPT_TIME_SCALE)
 
     if opt_model_dir is not None:
-        fields = env.config_space
-        fields += [BOPT_TIME_SCALE, 'substep', 'steps', 'success']
+        ic_fields = env.config_space
+        ic_fields += [BOPT_TIME_SCALE, 'substep', 'steps', 'success']
+
+        config_fields = [BOPT_TIME_SCALE] + list(agent.config_space.keys()) + ['accuracy']
 
         # Fix location generation
-        ic_logger = CSVLogger(f'{opt_model_dir}/../bopt_initial_conditions.csv', fields)
+        ic_logger     = CSVLogger(f'{opt_model_dir}/../bopt_initial_conditions.csv', ic_fields)
+        config_logger = CSVLogger(f'{opt_model_dir}/../bopt_configs.csv', config_fields)
+        incumbent_logger = CSVLogger(f'{opt_model_dir}/../bopt_incumbents.csv', config_fields)
     else:
-        ic_logger = None
+        ic_logger        = None
+        config_logger    = None
+        incumbent_logger = None
 
     if show_force:
         live_plot, live_plot_hook = gen_force_logger_and_hook()
@@ -224,7 +227,7 @@ def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10,
 
         # Save initial model and models every n-opts
         if opt_model_dir is not None:
-            if agent.is_in_gp_stage() and bopt_step == 1:
+            if agent.is_in_gp_stage() and bopt_step == 0:
                 agent.get_incumbent().save_model(f'{opt_model_dir}/gmm_base.npy')
             
             if incumbent_config != last_incumbent_config and n_incumbents % checkpoint_freq == 0:
@@ -250,6 +253,13 @@ def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10,
                                          initial_conditions_path=eval_ic_path)
             
             logger.log({'bopt deep eval accuracy': e_acc})
+
+            if incumbent_logger is not None and incumbent_config is not None:
+                inc_log = {BOPT_TIME_SCALE: bopt_step,
+                           'accuracy': e_acc}
+                inc_log.update(incumbent_config)
+                incumbent_logger.log(inc_log)
+
         
         if incumbent_eval is not None and incumbent_config != last_incumbent_config:
             eval_agent = common.AgentWrapper(agent.get_incumbent(),
@@ -301,6 +311,8 @@ def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10,
             video_logger, video_hook = common.gen_video_logger_and_hook(video_dir, f'bopt_{bopt_step:04d}', env.render_size[:2])
             post_step_hooks.append(video_hook)
 
+        bopt_config = agent.state.current_update.config
+
         # Collecting data for next BOPT update
         sub_ep_idx = 0
         while agent.get_bopt_step() == bopt_step:
@@ -322,6 +334,13 @@ def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10,
             if sub_ep_idx > 40:
                 n_ep = 500
                 break
+
+        if config_logger is not None:
+            _, _, bopt_accuracy = ep_acc.get_stats()
+            config_dict = {BOPT_TIME_SCALE: bopt_step,
+                           'accuracy': bopt_accuracy}
+            config_dict.update(bopt_config)
+            config_logger.log(config_dict)
 
         if video_dir is not None:
             _, _, bopt_accuracy = ep_acc.get_stats()
@@ -690,6 +709,7 @@ if __name__ == '__main__':
         gmm_path = Path(cfg.bopt_agent.gmm.model)
         gmm = GMM.load_model(cfg.bopt_agent.gmm.model)
         
+        print(f'Noise: {cfg.env.noise}')
 
         if args.wandb:
             run_name = f'eval_{cfg.bopt_agent.gmm.model[:-4]}'
