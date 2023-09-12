@@ -2,3 +2,7 @@
 **/experiments_*/
 **/wandb
 **/smac3_output
+
+*.csv
+*.png
+
