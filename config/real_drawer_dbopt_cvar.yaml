@@ -1,0 +1,14 @@
+defaults:
+  - real_drawer_scenario
+  - override bopt@bopt_agent: bopt_gmm_dbopt
+
+bopt_agent:
+  prior_range: 0.10  # Range to vary the prior weights by [-v, v]
+  mean_range:  0.05  # Range to vary the means in percentage by [-v, v]
+  base_accuracy: 0.65
+  opt_dims:
+    means: null
+    cvars:
+      type: rotation
+      unary: null
+      nary:  null

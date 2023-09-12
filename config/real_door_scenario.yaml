@@ -8,5 +8,5 @@ bopt_agent:
     type: position
     force_norm: 1
   # gripper_command: 0.0
-  num_episode_steps: 1000
+  num_episode_steps: 700
 

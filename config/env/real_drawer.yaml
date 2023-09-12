@@ -1,32 +1,59 @@
+# Name to identify the Python type of the environment from the ENV_TYPES registry
 type: real_drawer
 
+# Action frequency in Hz. Only divisors of 240 are supported.
 action_frequency: 30
 
-open_position: 0.15 # Meters
+# Translation distance at which the drawer is considered open.
+open_position: 0.2 # Meters
 
-reference_frame: obs_shelf_top_drawer
+# World TF-frame in which to plan motions
+reference_frame: panda_link0
+# Name of TF-frame of the drawer
 drawer_frame: obs_shelf_bottom_drawer
+# Name of TF-frame in which the opening position is measured
+# as translation along the X-axis
+drawer_measurement_frame: obs_drawer_reference
 
+# Box in reference frame in which it is safe to withdraw from the handle along the Z-axis
 handle_safe_zone:
-  min: [0.01, -0.25,-0.05]
-  max: [0.23, -0.16, 0.27]
+  min: [0.46, -0.15, 0.18]
+  max: [1.00,  0.15, 0.35]
 
+# Robot configuration
 robot:
+  # Prefix for the /panda_states topic
   state_prefix: /franka_state_controller
+  # Prefix of the controller namespace
   controllers_prefix: /controllers
+  # Name of the reference frame for motion generation
   reference_frame: panda_link0
-  endeffector_frame: panda_EE
-  fingers: 
-    - panda_finger_joint1
-    - panda_finger_joint2
+  # Name of the end-effector frame
+  endeffector_frame: panda_link8
+  # Configuration of the initial pose
   initial_pose:
-    q: [-0.283470908721288, -0.01968131141239746, 0.23310846994111087, -1.8926801469315597, 0.28080483474341467, 2.057301284342939, -0.07190465905093935]  # Starting point for IK and for frequent robot reset
+    # Starting pose for IK-solver and for frequent robot reset
+    q: [-0.0761568779861718, -0.24230009930803062, -0.00838963512687074, -2.6448513609067255, -0.0823553917474217, 2.7974888903564876, -2.2868770731857255]  # Starting point for IK and for frequent robot reset
+    # Starting position of gripper
     gripper_width: 0.05
+    # Starting position sampler of robot end-effector
     position:
-      min: [0.2, -0.10, 0.25]
-      max: [0.4,  0.15, 0.45]
-  joint_reset_frequency: 5  # Return the robot to the original q pose every n steps
+      min: [0.4, -0.10, 0.40]
+      max: [0.5,  0.15, 0.5]
+  # Reset robot pose after n episodes
+  joint_reset_frequency: 5
+  # Impedance settings for the end-effector
   stiffness:
-    linear: 300
+    linear: 400
     angular: 20
-  f_ext_limit: [12, 12, 15]
+  # Threshold for termination due tu experienced external linear force
+  f_ext_limit: [25, 25, 25]
+  # Set to True if robot is on the FMM. Enables check of tower collisions.
+  is_fmm: False
+
+teleop:
+  gamepad:
+    # Cols.:  LX  LY  RX  RY  DX  DY  LT  RT   A  LB  RB  L3  R3 BIAS
+    motion: [[ 0,  0,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,   0],
+             [ 0,  0,  0, -1,  0,  0,  0,  0,  0,  0,  0,  0,  0,   0],
+             [ 0,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,   0]]
