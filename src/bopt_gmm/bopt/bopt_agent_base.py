@@ -148,7 +148,7 @@ class GMMOptAgent(object):
             if len(e_cvar_params) > 0:
                 self._e_cvar_params = e_cvar_params
                 return self._e_cvar_params
-        return dict(sum([(f'cvar_{d}_{y}_{x}', (d, y, x)) for y, x in zip(*np.tril_indices(self.base_model.n_dims))], []))
+        return dict(sum([sum([(f'cvar_{d}_{y}_{x}', (d, y, x)) for y, x in zip(*np.tril_indices(self.base_model.n_dims))], []) for d in range(self.base_model.n_priors)], []))
 
     def update_model(self, parameter_update, inplace=True):
         if type(parameter_update) == TrialInfo:
@@ -288,8 +288,10 @@ class BOPTGMMAgentBase(GMMOptAgent):
                                   max_budget=self.config.budget_max,
                                   deterministic=True,
                                   use_default_config=True,
-                                  n_trials=self.config.n_trials)
+                                  n_trials=self.config.n_trials,
+                                  seed=-1)
 
+        # SEED IS  209652396
 
         facade = {'hpo': HyperparameterOptimizationFacade,
                   'hb' : HyperbandFacade,
@@ -306,12 +308,22 @@ class BOPTGMMAgentBase(GMMOptAgent):
                 n_seeds=1,  # We basically use one seed per config only
             )
 
+        initial_design = HyperparameterOptimizationFacade.get_initial_design(
+            self._scenario,
+            n_configs=5,
+            additional_configs=[  # to get the default configuration in the initial design
+                self._scenario.configspace.get_default_configuration()
+            ]
+        )
+
         self.state.gp_optimizer = facade(self._scenario,
                                          f_except,
                                          intensifier=intensifier,
-                                         overwrite=True)
+                                         overwrite=True,
+                                         initial_design=initial_design,
+                                         )
         # print(f'Base Model:\nPriors: {self.base_model.pi()}\nMu: {self.base_model.mu()}')
-        # self._tell(TrialInfo(self._scenario.configspace.get_default_configuration(), seed=0), 0.5)
+        # self._tell(TrialInfo(self._scenario.configspace.get_default_configuration(), seed=0), 50)
 
         self.update_model()
 
@@ -394,10 +406,10 @@ class BOPTGMMAgentBase(GMMOptAgent):
             incumbent = opt.intensifier.get_incumbent()
             if incumbent is not None:
                 return super().update_model(incumbent, inplace=False)
-        return self.model
+        return self.base_model
     
     def get_incumbent_config(self):
         opt = self.state.gp_optimizer # type: HyperbandFacade
         if opt is not None:
             return opt.intensifier.get_incumbent()
-        return self.model
+        return self._scenario.configspace.get_default_configuration()
