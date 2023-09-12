@@ -1,0 +1,4 @@
+python scripts/job_runner.py 1  "python scripts/main.py real_drawer_scenario --mode eval-gmm --deep-eval 30 --overrides +env.noise.position.variance=0.0 bopt_agent.gmm.model=models/gmm/real_drawer_7p.npy --eval-out /tmp/baselines_real_drawer_7p.csv" \
+                                "python scripts/main.py real_drawer_scenario --mode eval-gmm --deep-eval 30 --overrides +env.noise.position.variance=0.0 bopt_agent.gmm.model=models/gmm/real_drawer_5p.npy --eval-out /tmp/baselines_real_drawer_5p.csv" \
+                                "python scripts/main.py real_drawer_scenario --mode eval-gmm --deep-eval 30 --overrides +env.noise.position.variance=0.0 bopt_agent.gmm.model=models/gmm/real_drawer_3p.npy --eval-out /tmp/baselines_real_drawer_3p.csv"
+python scripts/csv_fusion.py data/baselines_real_drawer.csv /tmp/baselines_real_drawer_*.csv

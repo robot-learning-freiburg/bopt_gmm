@@ -1,0 +1,4 @@
+python scripts/job_runner.py 1  "python scripts/main.py real_door_scenario --mode eval-gmm --deep-eval 30 --overrides +env.noise.position.variance=0.0 bopt_agent.gmm.model=models/gmm/real_door_7p.npy --eval-out /tmp/baselines_real_door_7p.csv" \
+                                "python scripts/main.py real_door_scenario --mode eval-gmm --deep-eval 30 --overrides +env.noise.position.variance=0.0 bopt_agent.gmm.model=models/gmm/real_door_5p.npy --eval-out /tmp/baselines_real_door_5p.csv" \
+                                "python scripts/main.py real_door_scenario --mode eval-gmm --deep-eval 30 --overrides +env.noise.position.variance=0.0 bopt_agent.gmm.model=models/gmm/real_door_3p.npy --eval-out /tmp/baselines_real_door_3p.csv"
+python scripts/csv_fusion.py data/baselines_real_door.csv /tmp/baselines_real_door_*.csv
