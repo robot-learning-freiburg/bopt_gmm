@@ -39,7 +39,8 @@ from bopt_gmm import bopt, \
                      gmm
 
 from bopt_gmm.baselines import LSTMPolicy, \
-                               LSTMPolicyConfig
+                               LSTMPolicyConfig, \
+                               sac_gmm
 
 from bopt_gmm.gmm.generation import seds_gmm_generator, \
                                     em_gmm_generator
@@ -177,7 +178,8 @@ class IncumbentStats:
 
 def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10, 
                   opt_model_dir=None, logger=None, video_dir=None, 
-                  show_force=False, deep_eval_length=0, incumbent_eval=None):
+                  show_force=False, deep_eval_length=0, incumbent_eval=None,
+                  replay_recorder=None):
     if logger is not None:
         logger.define_metric('bopt accuracy',   BOPT_TIME_SCALE)
         logger.define_metric('bopt reward',     BOPT_TIME_SCALE)
@@ -189,6 +191,10 @@ def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10,
             logger.define_metric('bopt deep tell', BOPT_TIME_SCALE)
 
     if opt_model_dir is not None:
+        if replay_recorder is not None:
+            rp_buffer_path = Path(opt_model_dir) / '../replay_buffer'
+            rp_buffer_path.mkdir(exist_ok=True)
+
         ic_fields = env.config_space
         ic_fields += [BOPT_TIME_SCALE, 'substep', 'steps', 'success']
 
@@ -307,6 +313,9 @@ def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10,
         if live_plot_hook is not None:
             post_step_hooks.append(live_plot_hook)
 
+        if replay_recorder is not None:
+            post_step_hooks.append(replay_recorder.cb_post_step)
+
         if video_dir is not None:
             video_logger, video_hook = common.gen_video_logger_and_hook(video_dir, f'bopt_{bopt_step:04d}', env.render_size[:2])
             post_step_hooks.append(video_hook)
@@ -315,6 +324,10 @@ def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10,
 
         # Collecting data for next BOPT update
         sub_ep_idx = 0
+
+        if replay_recorder is not None:
+            replay_recorder.tell_update(agent.state.current_update)
+
         while agent.get_bopt_step() == bopt_step:
             ep_return, step, info = common.run_episode(env, agent, max_steps, post_step_hook=common.post_step_hook_dispatcher(*post_step_hooks))
             ep_acc.log_run(step + 1, ep_return, info['success'])
@@ -334,6 +347,9 @@ def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10,
             if sub_ep_idx > 40:
                 n_ep = 500
                 break
+
+        if replay_recorder is not None:
+            replay_recorder.save(rp_buffer_path)
 
         if config_logger is not None:
             _, _, bopt_accuracy = ep_acc.get_stats()
@@ -376,132 +392,57 @@ def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10,
         logger.log({'final performance': e_acc})
 
 
-def bopt_regularized_training(env, agent, reg_data, regularizer, 
-                              num_episodes, max_reg_value=0.5,
-                              max_steps=600, checkpoint_freq=10, 
-                              opt_model_dir=None, logger=None, video_dir=None, 
-                              show_force=False, deep_eval_length=0):
-    if logger is not None:
-        logger.define_metric('bopt accuracy',   BOPT_TIME_SCALE)
-        logger.define_metric('bopt reward',     BOPT_TIME_SCALE)
-        logger.define_metric('bopt mean steps', BOPT_TIME_SCALE)
-        logger.define_metric('n episode',       BOPT_TIME_SCALE)
-        if deep_eval_length > 0:
-            logger.define_metric('bopt deep eval accuracy', BOPT_TIME_SCALE)
+class ReplayBufferRecorder():
+    def __init__(self, env, sacgmm_steps, sacgmm_obs=None) -> None:
+        self._replay_buffer = sac_gmm.ReplayBuffer()
 
-    if opt_model_dir is not None:
-        fields = env.config_space
-        fields += [BOPT_TIME_SCALE, 'substep', 'steps', 'success']
-
-        # Fix location generation
-        ic_logger = CSVLogger(f'{opt_model_dir}/../bopt_initial_conditions.csv', fields)
-    else:
-        ic_logger = None
-
-    if show_force:
-        live_plot, live_plot_hook = gen_force_logger_and_hook()
-    else:
-        live_plot_hook = None
-
-    n_ep = 0
-    last_incumbent_config = -1
-    for training_step in tqdm(range(num_episodes), desc="Training BOPT model with regularization"):
-        ep_acc = common.RunAccumulator()
-        
-        incumbent_config = agent.get_incumbent_config()
-        # Save initial model and models every n-opts
-        if opt_model_dir is not None:
-            if agent.is_in_gp_stage() and training_step == 1:
-                agent.get_incumbent().save_model(f'{opt_model_dir}/gmm_base.npy')
-            
-            if incumbent_config != last_incumbent_config:
-                agent.get_incumbent().save_model(f'{opt_model_dir}/gmm_{training_step}.npy')
-        
-        # 
-        if deep_eval_length > 0 and incumbent_config != last_incumbent_config:
-            eval_video_dir = f'{video_dir}/eval_{training_step}' if video_dir is not None else None
-            if eval_video_dir is not None and not Path(eval_video_dir).exists():
-                Path(eval_video_dir).mkdir(parents=True)
-
-            # Fix location generation
-            eval_ic_path = f'{opt_model_dir}/../eval_{training_step}_ic.csv' if opt_model_dir is not None else None
-
-            eval_agent = common.AgentWrapper(agent.get_incumbent(),
-                                             agent.config.gripper_command)
-
-            e_acc, _, _ = evaluate_agent(env, eval_agent,
-                                         num_episodes=deep_eval_length,
-                                         max_steps=max_steps,
-                                         video_dir=eval_video_dir,
-                                         verbose=0,
-                                         initial_conditions_path=eval_ic_path)
-            
-            logger.log({'bopt deep eval accuracy': e_acc})
-
-        for tries in range(1000):
-            reg_val = regularizer(agent.model, agent.base_model, reg_data)
-            logger.log({'bopt reg value' : reg_val})
-            if reg_val <= max_reg_value:
-                break
-            
-            print(f'Regularization value: {reg_val}')
-            reward = 0 # reg_val * -100
-            # Log reg value as reward when it is used to update the model
-            logger.log({'bopt reward' : reward,
-                        'bopt ep run' : 0})
-            agent.force_tell(reward)
+        if sacgmm_obs is None:
+            self._sacgmm_obs = env.observation_space.keys()
         else:
-            raise Exception(f'Failed to generate a feasible update complying with regularization in {tries} attempts')
+            non_supported_obs = [o for o in sacgmm_obs if o not in env.observation_space]
+            if len(non_supported_obs) > 0:
+                raise RuntimeError('Observations specified for SACGMM replay buffer are not supported:\n{}Options are:\n{}'.format(
+                    ', '.join(non_supported_obs), ','.join(env.observation_space.keys())
+                ))
+            self._sacgmm_obs = sacgmm_obs
+        
+        self._sacgmm_steps = sacgmm_steps
+        self.reset()
 
-        last_incumbent_config = incumbent_config
+    def reset_counter(self):
+        self._current_step = 0
+        self._current_pre_obs = None
+        self._reward = 0
 
-        # Setup post-step hooks  
-        post_step_hooks = [common.post_step_hook_bopt]
-        if live_plot_hook is not None:
-            post_step_hooks.append(live_plot_hook)
+    def reset(self):
+        self.reset_counter()
+        self._current_update  = None
 
-        if video_dir is not None:
-            video_logger, video_hook = common.gen_video_logger_and_hook(video_dir, f'bopt_{training_step:04d}', env.render_size[:2])
-            post_step_hooks.append(video_hook)
+    def tell_update(self, update):
+        self._current_update = update
 
-        # Collecting data for next BOPT update
-        sub_ep_idx = 0
-        initial_bopt_step = agent.get_bopt_step()
-        while agent.get_bopt_step() == initial_bopt_step:
-            ep_return, step, info = common.run_episode(env, agent, max_steps, post_step_hook=common.post_step_hook_dispatcher(*post_step_hooks))
-            ep_acc.log_run(step + 1, ep_return, info['success'])
-            if ic_logger is not None:
-                ic = info['initial_conditions']
-                ic.update({BOPT_TIME_SCALE: training_step, 
-                           'substep': sub_ep_idx, 
-                           'steps' : step + 1, 
-                           'success': info['success']})
-                ic_logger.log(ic)
-            sub_ep_idx += 1
-            n_ep += 1
+    def cb_post_step(self, step, env, agent, obs, post_obs, action, reward, done, info):
+        self._reward       += reward
+        self._current_step += 1
 
-        if video_dir is not None:
-            _, _, bopt_accuracy = ep_acc.get_stats()
-            video_logger.rename(f'bopt_{training_step:04d}_{bopt_accuracy:1.3f}')
+        if self._current_pre_obs is None:
+            self._current_pre_obs = {k: v for k, v in obs.items() if k in self._sacgmm_obs}
+        elif self._current_step == self._sacgmm_steps or done:
+            self._replay_buffer.add_transition(self._current_pre_obs,
+                                               self._current_update,
+                                               {k: v for k, v in post_obs.items() if k in self._sacgmm_obs},
+                                               self._reward,
+                                               done)
+            self.reset_counter()
 
-        # Log results of execution from this step
-        if logger is not None:
-            bopt_mean_steps, bopt_reward, bopt_accuracy = ep_acc.get_stats()
-            logger.log({'bopt mean steps': bopt_mean_steps,
-                        'bopt reward'    : bopt_reward, 
-                        'bopt accuracy'  : bopt_accuracy,
-                        'n episode'      : n_ep})
-
-    # Save final model
-    if opt_model_dir is not None:
-        agent.get_incumbent().save_model(f'{opt_model_dir}/gmm_final.npy')
-
+    def save(self, path : Path):
+        self._replay_buffer.save(path)
 
 
 def main_bopt_agent(env, bopt_agent_config, conf_hash, 
                     show_force=True, wandb=False, log_prefix=None, 
                     data_dir=None, render_video=False, deep_eval_length=0,
-                    trajectories=None, ckpt_freq=10):
+                    trajectories=None, ckpt_freq=10, sacgmm_steps=None, sacgmm_obs=None):
 
     if bopt_agent_config.agent not in {'bopt-gmm', 'dbopt', 'online'}:
         raise Exception(f'Unkown agent type "{bopt_agent_config.agent}"')
@@ -629,25 +570,17 @@ def main_bopt_agent(env, bopt_agent_config, conf_hash,
         else:
             agent = BOPTGMMAgent(base_gmm, config, logger=logger)
 
-    if 'regularizer' not in bopt_agent_config:
-        bopt_training(env, agent,
-                      num_episodes=bopt_agent_config.num_training_cycles, 
-                      max_steps=bopt_agent_config.num_episode_steps, 
-                      opt_model_dir=model_dir, logger=logger, 
-                      video_dir=video_dir, show_force=show_force,
-                      checkpoint_freq=ckpt_freq,
-                      deep_eval_length=deep_eval_length,
-                      incumbent_eval=bopt_agent_config.incumbent_eval)
-    else:
-        regularizer = reg.gen_regularizer(bopt_agent_config.regularizer)
-        bopt_regularized_training(env, agent, np.vstack(trajectories), regularizer, 
-                                  max_reg_value=bopt_agent_config.regularizer.max_val,
-                                  num_episodes=bopt_agent_config.num_training_cycles, 
-                                  max_steps=bopt_agent_config.num_episode_steps, 
-                                  opt_model_dir=model_dir, logger=logger, 
-                                  video_dir=video_dir, show_force=show_force, 
-                                  deep_eval_length=deep_eval_length,
-                                  checkpoint_freq=ckpt_freq)
+    rp_recorder = ReplayBufferRecorder(env, sacgmm_steps, sacgmm_obs) if sacgmm_steps is not None and model_dir is not None else None
+
+    bopt_training(env, agent,
+                  num_episodes=bopt_agent_config.num_training_cycles, 
+                  max_steps=bopt_agent_config.num_episode_steps, 
+                  opt_model_dir=model_dir, logger=logger, 
+                  video_dir=video_dir, show_force=show_force,
+                  checkpoint_freq=ckpt_freq,
+                  deep_eval_length=deep_eval_length,
+                  incumbent_eval=bopt_agent_config.incumbent_eval,
+                  replay_recorder=rp_recorder)
     # print(f'Accuracy: {acc} Mean return: {return_mean} Mean ep length: {mean_ep_length}')
     # bopt_res = agent.state.gp_optimizer.get_result()
     # print(f'F means: {bopt_res.x}\nReward: {bopt_res.fun}')
@@ -670,6 +603,8 @@ if __name__ == '__main__':
     parser.add_argument('--eval-out', default=None, help='File to write results of evaluation to. Will write in append mode.')
     parser.add_argument('--bc-inputs', default=['position'], nargs='+', help='Observations to feed to BC policy.')
     parser.add_argument('--seed', default=None, type=int, help='Fixes the seed of numpy and random.')
+    parser.add_argument('--sacgmm-steps', default=None, type=int, help='Size of a sacgmm step. If set will trigger replay buffer generation.')
+    parser.add_argument('--sacgmm-obs', default=None, nargs='*', type=set, help='Filter for observations recorded in sacgmm replay buffer.')
     args = parser.parse_args()
 
     if args.seed is not None:
@@ -703,7 +638,9 @@ if __name__ == '__main__':
                         args.wandb, args.run_prefix, 
                         args.data_dir, render_video=args.video, 
                         deep_eval_length=args.deep_eval, trajectories=trajs,
-                        ckpt_freq=args.ckpt_freq)
+                        ckpt_freq=args.ckpt_freq,
+                        sacgmm_steps=args.sacgmm_steps,
+                        sacgmm_obs=args.sacgmm_obs)
 
     elif args.mode == 'eval-gmm':
         gmm_path = Path(cfg.bopt_agent.gmm.model)

@@ -10,6 +10,13 @@ Transition = namedtuple(
     "Transition", ["state", "action", "next_state", "reward", "done"]
 )
 
+def _default_processor(data) -> Transition:
+    return Transition(data["state"].item(),
+                      data["action"],
+                      data["next_state"].item(),
+                      data["reward"].item(),
+                      data["done"].item())
+
 class ReplayBuffer:
     def __init__(self, max_capacity=5000000):
         self.logger = logging.getLogger(__name__)
@@ -82,7 +89,7 @@ class ReplayBuffer:
             return True
         return False
 
-    def load(self, path="./replay_buffer"):
+    def load(self, path="./replay_buffer", data_processor=_default_processor):
         if path is None:
             return False
         p = Path(path)
@@ -94,13 +101,7 @@ class ReplayBuffer:
             if len(files) > 0:
                 for file in tqdm(files, desc=f"Loading replay buffer from{path}"):
                     data = np.load(file, allow_pickle=True)
-                    transition = Transition(
-                        data["state"].item(),
-                        data["action"],
-                        data["next_state"].item(),
-                        data["reward"].item(),
-                        data["done"].item(),
-                    )
+                    transition = data_processor(data)
                     self.replay_buffer.append(transition)
                 self.logger.info(
                     "Replay buffer loaded successfully %d files" % len(files)

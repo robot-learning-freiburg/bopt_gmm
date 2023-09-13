@@ -37,7 +37,8 @@ class SACAgent(object):
                        critic_target_network,
                        action_space,
                        logger = None,
-                       device='cuda') -> None:
+                       device='cuda',
+                       replay_buffer=None) -> None:
         """
         Args:
             env: training environment
@@ -50,7 +51,7 @@ class SACAgent(object):
         self.logger        = logger
         self._action_space = action_space
         self._device       = device
-        self.replay_buffer = ReplayBuffer(self.config.replay_buffer_size)
+        self.replay_buffer = ReplayBuffer(self.config.replay_buffer_size) if replay_buffer is None else replay_buffer
 
         self.target_entropy = -np.prod(action_space.shape).item() 
 

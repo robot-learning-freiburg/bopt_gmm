@@ -41,6 +41,10 @@ class SACGMMEnv(Env):
         self._obs_filter  = obs_filter
         self._gripper_command = gripper_command
         self._cb = cb if cb is not None else []
+        
+        # Generate internals
+        self.observation_space
+        self.action_space
 
     def add_callback(self, cb):
         self._cb.append(cb)
@@ -85,6 +89,9 @@ class SACGMMEnv(Env):
 
         return Box(low=np.asarray(lb),
                    high=np.asarray(ub))
+
+    def _convert_action(self, action_dict):
+        return np.hstack([action_dict[k] for k in self._action_dims])
 
     def _convert_obs(self, obs_dict):
         return np.hstack([obs_dict[d] for d in self._obs_dims])

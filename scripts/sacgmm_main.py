@@ -48,9 +48,7 @@ from bopt_gmm.logging import WBLogger, \
                              MP4VideoLogger, \
                              CSVLogger
 
-from bopt_gmm.envs import PegEnv,   \
-                          DoorEnv,  \
-                          ENV_TYPES
+from rl_tasks import ENV_TYPES
 
 from bopt_gmm.baselines import sac_gmm
 from bopt_gmm.common    import run_episode
@@ -63,9 +61,22 @@ from stable_baselines3.sac import MlpPolicy
 from tqdm import tqdm
 
 
-def build_sacgmm(env, gmm_agent, gripper_command, sacgmm_config, logger, device='cuda'):
+def build_sacgmm(env, gmm_agent, gripper_command, sacgmm_config, logger, device='cuda', replay_buffer_path=None):
     sacgmm_env = sac_gmm.SACGMMEnv(env, gmm_agent, gripper_command, sacgmm_config, 
                                    obs_filter=set(sacgmm_config.observations))
+
+    if replay_buffer_path is not None:
+        def transition_processor(data) -> sac_gmm.Transition:
+            return sac_gmm.Transition(sacgmm_env._convert_obs(data["state"].item()),
+                                      sacgmm_env._convert_action(data["action"].item().config),
+                                      sacgmm_env._convert_obs(data["next_state"].item()),
+                                      data["reward"].item(),
+                                      data["done"].item())
+
+        replay_buffer = sac_gmm.ReplayBuffer()
+        replay_buffer.load(replay_buffer_path, transition_processor)
+    else:
+        replay_buffer = None
 
     obs_dim    = int(np.product(sacgmm_env.observation_space.shape).item())
     action_dim = int(np.product(sacgmm_env.action_space.shape).item())
@@ -93,7 +104,8 @@ def build_sacgmm(env, gmm_agent, gripper_command, sacgmm_config, logger, device=
                            critic_target, 
                            sacgmm_env.action_space,
                            logger,
-                           device)
+                           device,
+                           replay_buffer=replay_buffer)
 
     return sac, sacgmm_env
 
@@ -149,7 +161,7 @@ def evaluate_sacgmm(env : sac_gmm.SACGMMEnv,
 
 
 def train_sacgmm(env, cfg, num_training_cycles, max_steps, 
-                 wandb, data_dir, run_id, deep_eval_length=0, ckpt_freq=10):
+                 wandb, data_dir, run_id, deep_eval_length=0, ckpt_freq=10, replay_buffer_path=None):
     logger = WBLogger('bopt-gmm', run_id, True) if wandb else BlankLogger()
     logger.log_config(cfg)
     
@@ -175,7 +187,7 @@ def train_sacgmm(env, cfg, num_training_cycles, max_steps,
 
     gmm = GMM.load_model(boptgmm_config.gmm.model)
     gmm_agent = GMMOptAgent(gmm, boptgmm_config)
-    sac_agent, sacgmm_env = build_sacgmm(env, gmm_agent, boptgmm_config.gripper_command, sacgmm_config, logger)
+    sac_agent, sacgmm_env = build_sacgmm(env, gmm_agent, boptgmm_config.gripper_command, sacgmm_config, logger, replay_buffer_path=replay_buffer_path)
 
     if logger is not None:
         for m in sac_agent.metrics:        
@@ -184,10 +196,10 @@ def train_sacgmm(env, cfg, num_training_cycles, max_steps,
     # We count all episodes, including the ones to fill replay
     ep_count = 0
 
-    if True:
+    if len(sac_agent.replay_buffer) < sac_agent.warm_start_steps:
         # Fill replay buffer
         obs_prior = sacgmm_env.reset()
-        for _ in tqdm(range(sac_agent.warm_start_steps), desc='Filling replay buffer...'):
+        for _ in tqdm(range(sac_agent.warm_start_steps - len(sac_agent.replay_buffer)), desc='Filling replay buffer...'):
             action = sac_agent.get_action(obs_prior, sacgmm_config.fill_strategy)
             obs_post, reward, done, info = sacgmm_env.step(action)
             
@@ -201,13 +213,6 @@ def train_sacgmm(env, cfg, num_training_cycles, max_steps,
                 ep_count += 1
             else:
                 obs_prior = obs_post
-    else:  # Fake filling of replay buffer for development purposes
-        obs_prior = sacgmm_env.reset()
-        action    = sac_agent.get_action(obs_prior, sacgmm_config.fill_strategy)
-        
-        for x in tqdm(range(sac_agent.warm_start_steps), desc='FAKE Filling replay buffer...'):
-            done = x % 5 == 1
-            sac_agent.append_to_replay_buffer(obs_prior, action, obs_prior, float(done) * 100, done)
 
     obs_prior = sacgmm_env.reset()
     if ic_logger is not None:
@@ -286,6 +291,7 @@ if __name__ == '__main__':
     parser.add_argument('--eval-out', default=None, help='File to write results of evaluation to. Will write in append mode.')
     parser.add_argument('--sac-model', default=None, help='Path to model to resume training from or to evaluate.')
     parser.add_argument('--seed', default=None, type=int, help='Fixes the seed of numpy, torch, and random.')
+    parser.add_argument('--replay-buffer', default=None, type=str, help='Points to a directory containing transitions for a replay buffer.')
     args = parser.parse_args()
 
     if args.seed is not None:
@@ -322,7 +328,8 @@ if __name__ == '__main__':
                      data_dir=args.data_dir, 
                      run_id=args.run_prefix,
                      deep_eval_length=args.deep_eval,
-                     ckpt_freq=args.ckpt_freq)
+                     ckpt_freq=args.ckpt_freq,
+                     replay_buffer_path=args.replay_buffer)
     elif args.mode == 'eval':
         if args.sac_model is None:
             print('Need "--sac-model" argument for evaluation.')
