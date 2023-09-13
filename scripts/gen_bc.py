@@ -66,6 +66,6 @@ if __name__ == '__main__':
 
             losses.append(lstm_model.update_params(obs, action)['loss'].detach().cpu().numpy())
             
-            print(f'Policy loss episode {ep}: {np.mean(losses)}')
+            # print(f'Policy loss episode {ep}: {np.mean(losses)}')
 
     lstm_model.save_model(args.out)
