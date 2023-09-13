@@ -4,6 +4,8 @@ action_frequency: 30
 
 goal_threshold: 0.15 # Degrees
 
+gripper_camera: False
+
 door:
   path: package://bopt_gmm/objects/hatch_door.urdf
 

@@ -4,6 +4,8 @@ action_frequency: 30
 
 open_threshold: 35 # Degrees
 
+gripper_camera: False
+
 door:
   path: package://bopt_gmm/objects/door.urdf
   reference_link: base_link
