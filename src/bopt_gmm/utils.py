@@ -252,7 +252,7 @@ class JobRunner():
         with open(os.devnull, 'w') as devnull:
             while len(tasks) > 0:
                 while len(self.processes) < self.n_proc and len(tasks) > 0:
-                    self.processes.append(Popen(tasks[0], stdout=devnull))
+                    self.processes.append(Popen(tasks[0])) #, stdout=devnull))
                     print(f'Launched task "{" ".join(tasks[0])}"\nRemaining {len(tasks) - 1}')
                     tasks = tasks[1:]
 

@@ -7,6 +7,7 @@ import yaml
 from argparse        import ArgumentParser
 from dataclasses     import dataclass
 from multiprocessing import RLock
+from rl_tasks        import ENV_TYPES
 from roebots         import ROSVisualizer
 
 from sensor_msgs.msg   import JointState       as JointStateMsg
@@ -14,7 +15,6 @@ from std_msgs.msg      import String           as StringMsg
 from geometry_msgs.msg import TransformStamped as TransformStampedMsg, \
                               WrenchStamped    as WrenchStampedMsg
 
-from bopt_gmm.envs   import ENV_TYPES
 from bopt_gmm.gmm    import GMM, \
                             utils as gmm_utils
 from bopt_gmm.common import AgentWrapper
@@ -59,7 +59,6 @@ if __name__ == '__main__':
 
 
     def cb_js(msg : JointStateMsg):
-        return
         new_update = dict(zip(msg.name, msg.position))
         if app_state.last_update is None or max([app_state.last_update[k] != v for k, v in new_update.items()]):
             app_state.last_update = new_update
@@ -92,9 +91,10 @@ if __name__ == '__main__':
     ref_msg  = TransformStampedMsg()
     ref_msg.header.frame_id = 'panda_link0'
     ref_msg.child_frame_id  = 'gmm_reference'
-    
-    wrench_msg = WrenchStampedMsg()
-    wrench_msg.header.frame_id = env.robot.joints[cfg.env.robot.ft_joint].link._name
+    ref_msg.transform.rotation.w = 1.0
+
+    # wrench_msg = WrenchStampedMsg()
+    # wrench_msg.header.frame_id = env.robot.joints[cfg.env.robot.ft_joint].link._name
 
     env_steps = 0
     while not rospy.is_shutdown():
@@ -112,29 +112,29 @@ if __name__ == '__main__':
         env_steps += 1
 
         # Publish robot state for visualization in RVIZ
-        js_msg = JointStateMsg()
-        js_msg.header.stamp = rospy.Time.now()
-        js_msg.name = env.robot.dynamic_joint_names
-        js_msg.position = env.robot.q
+        # js_msg = JointStateMsg()
+        # js_msg.header.stamp = rospy.Time.now()
+        # js_msg.name = env.robot.dynamic_joint_names
+        # js_msg.position = env.robot.q
 
-        pub.publish(js_msg)
+        # pub.publish(js_msg)
     
-        wrench_msg.header.stamp = js_msg.header.stamp
-        wrench_msg.wrench.force.x, wrench_msg.wrench.force.y, wrench_msg.wrench.force.z    = obs['force']
-        wrench_msg.wrench.torque.x, wrench_msg.wrench.torque.y, wrench_msg.wrench.torque.z = obs['torque']
-        pub_wrench.publish(wrench_msg)
+        # wrench_msg.header.stamp = js_msg.header.stamp
+        # wrench_msg.wrench.force.x, wrench_msg.wrench.force.y, wrench_msg.wrench.force.z    = obs['force']
+        # wrench_msg.wrench.torque.x, wrench_msg.wrench.torque.y, wrench_msg.wrench.torque.z = obs['torque']
+        # pub_wrench.publish(wrench_msg)
 
-        ref_pose = env.reference_frame
-        ref_msg.transform.translation.x, \
-        ref_msg.transform.translation.y, \
-        ref_msg.transform.translation.z = ref_pose.position
+        # ref_pose = env.reference_frame
+        # ref_msg.transform.translation.x, \
+        # ref_msg.transform.translation.y, \
+        # ref_msg.transform.translation.z = ref_pose.position
         
-        ref_msg.transform.rotation.x, \
-        ref_msg.transform.rotation.y, \
-        ref_msg.transform.rotation.z, \
-        ref_msg.transform.rotation.w = ref_pose.quaternion
+        # ref_msg.transform.rotation.x, \
+        # ref_msg.transform.rotation.y, \
+        # ref_msg.transform.rotation.z, \
+        # ref_msg.transform.rotation.w = ref_pose.quaternion
 
-        ref_msg.header.stamp = js_msg.header.stamp
+        ref_msg.header.stamp = rospy.Time.now() # js_msg.header.stamp
         tf_broadcaster.sendTransform(ref_msg)
 
         # print(env.observation()
