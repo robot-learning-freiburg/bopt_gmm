@@ -7,7 +7,7 @@ open_threshold: 35 # Degrees
 gripper_camera: False
 
 door:
-  path: package://bopt_gmm/objects/door.urdf
+  path: package://rl_tasks/objects/door.urdf
   reference_link: base_link
   sampler:
     min: [0.7, -0.05, 0]
@@ -19,7 +19,7 @@ noise:
     constant: true
 
 robot:
-  path: package://bopt_gmm/robots/panda_hand.urdf
+  path: package://rl_tasks/robots/panda_hand.urdf
   eef: panda_hand_tcp
   ft_joint: panda_hand_joint
   fingers: 
