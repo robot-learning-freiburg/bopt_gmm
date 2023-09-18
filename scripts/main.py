@@ -2,6 +2,7 @@ import cv2
 import hydra
 import numpy as np
 import time
+import yaml
 
 import random
 
@@ -406,6 +407,7 @@ class ReplayBufferRecorder():
                 ))
             self._sacgmm_obs = sacgmm_obs
         
+        self._episode_ends = []
         self._sacgmm_steps = sacgmm_steps
         self.reset()
 
@@ -433,10 +435,15 @@ class ReplayBufferRecorder():
                                                {k: v for k, v in post_obs.items() if k in self._sacgmm_obs},
                                                self._reward,
                                                done)
+            if done:
+                self._episode_ends.append(len(self._replay_buffer))
             self.reset_counter()
 
     def save(self, path : Path):
         self._replay_buffer.save(path)
+        with open(path / 'rp_meta.yaml', 'w') as f:
+            yaml.dump({'num_episodes': len(self._episode_ends),
+                       'episode_ends': self._episode_ends})
 
 
 def main_bopt_agent(env, bopt_agent_config, conf_hash, 
