@@ -24,6 +24,9 @@ class ReplayBuffer:
         self.curr_file_idx = 1
         self.replay_buffer = deque(maxlen=int(max_capacity))
 
+    def __getitem__(self, idx):
+        return self.replay_buffer[idx]
+
     def __len__(self) -> int:
         return len(self.replay_buffer)
 
