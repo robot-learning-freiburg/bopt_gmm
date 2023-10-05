@@ -1,13 +1,16 @@
 import numpy as np
+import torch
+import torchvision.transforms as T
 
-from bopt_gmm.bopt import GMMOptAgent
-from dataclasses   import dataclass
-from functools     import lru_cache
-from gym           import Env
-from gym.spaces    import Box
-from typing        import List
+from bopt_gmm.bopt      import GMMOptAgent
+from dataclasses        import dataclass
+from functools          import lru_cache
+from gym                import Env
+from gym.spaces         import Box
+from torchvision.models import resnet18, ResNet18_Weights
+from typing             import Any, List
 
-from bopt_gmm.bopt import BOPT_TIME_SCALE
+from bopt_gmm.bopt      import BOPT_TIME_SCALE
 
 
 def f_void(*args):
@@ -22,13 +25,49 @@ class SACGMMEnvCallback:
     on_post_step     = f_void
 
 
+class ObservationProcessor:
+    def __init__(self, original_size=None):
+        pass
+
+    def out_space(self):
+        raise NotImplementedError
+
+    def __call__(self, observation) -> Any:
+        raise NotImplementedError
+
+
+class Resnet18Processor(ObservationProcessor):
+    def __init__(self, original_size=None) -> None:
+        self.wrap  = torch.nn.Sequential(*(list(resnet18(weights=ResNet18_Weights.DEFAULT).children())[:-2]))
+        preprocess = ResNet18_Weights.DEFAULT.transforms()
+        self.mean  = np.array(preprocess.mean)
+        self.std   = np.array(preprocess.std)
+
+    def __call__(self, observation) -> Any:
+        with torch.no_grad():
+            norm = T.Compose(
+                [
+                    T.Resize(32, interpolation=T.functional.InterpolationMode.BILINEAR),
+                    T.Normalize(mean=self.mean, std=self.std),
+                ]
+            )
+            o = norm(observation / 255.0)
+            return self.wrap(o)
+        
+    def out_space(self):
+        return Box(low=np.zeros(512),
+                   high=np.ones(512))
+
+OBSERVATION_PROCESSORS = {'resnet18' : Resnet18Processor}
+
 
 class SACGMMEnv(Env):
     def __init__(self, env : Env, 
                  gmm_agent : GMMOptAgent, 
                  gripper_command, 
                  sacgmm_config,
-                 obs_filter={'position', 'force'}, 
+                 obs_filter={'position', 'force'},
+                 obs_processors=None,  
                  cb : List[SACGMMEnvCallback] = None):
         self.agent  = gmm_agent
         self.env    = env
@@ -41,7 +80,8 @@ class SACGMMEnv(Env):
         self._obs_filter  = obs_filter
         self._gripper_command = gripper_command
         self._cb = cb if cb is not None else []
-        
+        self._obs_processors = {} if obs_processors is None else obs_processors
+
         # Generate internals
         self.observation_space
         self.action_space
@@ -69,8 +109,12 @@ class SACGMMEnv(Env):
         for k, bound in self.env.observation_space.items():
             if k in self._obs_filter:
                 self._obs_dims.append(k)
-                lb.append(bound.low)
-                ub.append(bound.high)
+                if k in self._obs_processors:
+                    lb.append(self._obs_processors[k].out_space().low)
+                    ub.append(self._obs_processors[k].out_space().high)
+                else:
+                    lb.append(bound.low)
+                    ub.append(bound.high)
 
         return Box(low=np.hstack(lb),
                    high=np.hstack(ub))
@@ -94,7 +138,7 @@ class SACGMMEnv(Env):
         return np.hstack([action_dict[k] for k in self._action_dims])
 
     def _convert_obs(self, obs_dict):
-        return np.hstack([obs_dict[d] for d in self._obs_dims])
+        return np.hstack([obs_dict[d] if d not in self._obs_processors else self._obs_processors[d](obs_dict[d]) for d in self._obs_dims])
 
     def reset(self):
         self.agent.reset()

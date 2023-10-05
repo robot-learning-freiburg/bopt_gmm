@@ -38,7 +38,11 @@ from tqdm import tqdm
 
 
 def build_sacgmm(env, gmm_agent, gripper_command, sacgmm_config, logger, device='cuda', replay_buffer_config=None):
+    obs_processors = {o: sac_gmm.OBSERVATION_PROCESSORS[t]() for o, t in sacgmm_config.observation_processors.items()} if 'observation_processors' in sacgmm_config else None
+
     sacgmm_env = sac_gmm.SACGMMEnv(env, gmm_agent, gripper_command, sacgmm_config, 
+                                   obs_filter=set(sacgmm_config.observations),
+                                   obs_processors=obs_processors)
 
     replay_buffer, new_gmm, episode_offset = build_replay_buffer(replay_buffer_config, sacgmm_env, gmm_agent)
     if new_gmm is not None:

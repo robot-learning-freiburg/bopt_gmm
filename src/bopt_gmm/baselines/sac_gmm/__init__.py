@@ -4,6 +4,8 @@ try:
     from .actor  import DenseNetActor
     from .agent  import SACAgent
     from .critic import DenseNetCritic
+    from .env    import SACGMMEnv, \
+                        OBSERVATION_PROCESSORS
 except ModuleNotFoundError:
     class DenseNetActor():
         def __init__(self, *args, **kwargs) -> None:
@@ -21,6 +23,5 @@ except ModuleNotFoundError:
         def __init__(self, *args, **kwargs) -> None:
             raise NotImplementedError
 
-from .env          import SACGMMEnv
-from.replay_buffer import ReplayBuffer, \
-                          Transition
+from .replay_buffer import ReplayBuffer, \
+                           Transition
