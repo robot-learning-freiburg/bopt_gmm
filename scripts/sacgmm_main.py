@@ -1,51 +1,29 @@
 import cv2
 import hydra
-import numpy as np
-import torch
+import numpy  as np
+import pandas as pd
 import random
+import torch
+import yaml
 
 from argparse      import ArgumentParser
-from ConfigSpace   import ConfigurationSpace
-from ConfigSpace   import UniformFloatHyperparameter
-from dataclasses   import dataclass
 from datetime      import datetime
-from math          import inf as Infinity
 from omegaconf     import OmegaConf
 from pathlib       import Path
-from skopt         import gp_minimize
 from tqdm          import tqdm
-from torch         import nn
 
-from bopt_gmm.bopt import BOPTGMMCollectAndOptAgent, \
-                          GMMOptAgent,               \
-                          BOPTGMMAgent,              \
-                          BOPTAgentGMMConfig,        \
-                          BOPTAgentGenGMMConfig,     \
+from bopt_gmm.bopt import GMMOptAgent,               \
                           BOPT_TIME_SCALE
 import bopt_gmm.bopt.regularization as reg
                           
-from bopt_gmm.gmm import GMM,             \
-                         GMMCart3D,       \
-                         GMMCart3DForce,  \
-                         GMMCart3DTorque, \
-                         load_gmm
+from bopt_gmm.gmm import GMM
 
-from bopt_gmm import bopt, \
-                     common, \
-                     gmm
-
-from bopt_gmm.gmm.generation import seds_gmm_generator, \
-                                    em_gmm_generator
+from bopt_gmm import gmm
 
 from bopt_gmm.utils   import conf_checksum, \
-                             unpack_trajectories
+                             shift_updates
 from bopt_gmm.logging import WBLogger, \
                              BlankLogger, \
-                             LivePlot, \
-                             create_dpg_context, \
-                             is_dpg_running, \
-                             render_dpg_frame, \
-                             MP4VideoLogger, \
                              CSVLogger
 
 from rl_tasks import ENV_TYPES
@@ -56,27 +34,16 @@ from bopt_gmm.common    import run_episode
 np.object = object
 np.bool   = bool
 
-from stable_baselines3     import SAC
-from stable_baselines3.sac import MlpPolicy
 from tqdm import tqdm
 
 
-def build_sacgmm(env, gmm_agent, gripper_command, sacgmm_config, logger, device='cuda', replay_buffer_path=None):
+def build_sacgmm(env, gmm_agent, gripper_command, sacgmm_config, logger, device='cuda', replay_buffer_config=None):
     sacgmm_env = sac_gmm.SACGMMEnv(env, gmm_agent, gripper_command, sacgmm_config, 
-                                   obs_filter=set(sacgmm_config.observations))
 
-    if replay_buffer_path is not None:
-        def transition_processor(data) -> sac_gmm.Transition:
-            return sac_gmm.Transition(sacgmm_env._convert_obs(data["state"].item()),
-                                      sacgmm_env._convert_action(data["action"].item().config),
-                                      sacgmm_env._convert_obs(data["next_state"].item()),
-                                      data["reward"].item(),
-                                      data["done"].item())
-
-        replay_buffer = sac_gmm.ReplayBuffer()
-        replay_buffer.load(replay_buffer_path, transition_processor)
-    else:
-        replay_buffer = None
+    replay_buffer, new_gmm, episode_offset = build_replay_buffer(replay_buffer_config, sacgmm_env, gmm_agent)
+    if new_gmm is not None:
+        gmm_agent.base_gmm = new_gmm
+        gmm_agent.reset()
 
     obs_dim    = int(np.product(sacgmm_env.observation_space.shape).item())
     action_dim = int(np.product(sacgmm_env.action_space.shape).item())
@@ -107,7 +74,7 @@ def build_sacgmm(env, gmm_agent, gripper_command, sacgmm_config, logger, device=
                            device,
                            replay_buffer=replay_buffer)
 
-    return sac, sacgmm_env
+    return sac, sacgmm_env, episode_offset
 
 
 def evaluate_sacgmm(env : sac_gmm.SACGMMEnv, 
@@ -160,8 +127,71 @@ def evaluate_sacgmm(env : sac_gmm.SACGMMEnv,
     return successful_episodes / ep, episode_returns, episode_lengths
 
 
+def build_replay_buffer(cfg_rpb, sacgmm_env, base_agent):
+    rpb = sac_gmm.ReplayBuffer(cfg_rpb.max_size)
+    new_gmm = None
+    
+    if cfg_rpb.load_path is None:
+        return rpb, new_gmm, 0
+    
+    def transition_processor(data) -> sac_gmm.Transition:
+        return sac_gmm.Transition(sacgmm_env._convert_obs(data["state"].item()),
+                                  sacgmm_env._convert_action(data["action"].item().config),
+                                  sacgmm_env._convert_obs(data["next_state"].item()),
+                                  data["reward"].item(),
+                                  data["done"].item())
+    
+    if cfg_rpb.selection_strategy == 'steps':
+        rpb.load(cfg_rpb.load_path,
+                 data_processor=transition_processor, num_transitions=cfg_rpb.step_count)
+    else:
+        # Load meta info
+        rp_path = Path(cfg_rpb.load_path)
+        episode_offset = 0
+        with open(rp_path / 'rp_meta.yaml', 'r') as f:
+            meta_info = yaml.load(f)
+
+        if cfg_rpb.selection_strategy == 'episodes':
+            episode_offset   = cfg_rpb.episode_count
+            transition_count = meta_info['episode_ends'][:episode_offset][-1]
+            rpb.load(rp_path, data_processor=transition_processor, num_transitions=transition_count)
+        else: 
+            
+            # load incumbent info an do the entire
+            df_inc  = pd.read_csv(rp_path.parent / 'bopt_incumbents.csv')
+            if cfg_rpb.selection_strategy in {'incumbent_num', 'incumbent_gmm_num'}:
+                idx_inc = min(len(df_inc.episodes), cfg_rpb.incumbent_to_pick) - 1
+            elif cfg_rpb.selection_strategy in {'incumbent_limit', 'incumbent_gmm_limit'}:
+                idx_inc = df_inc.episodes[df_inc.episodes <= cfg_rpb.episode_count].index[-1]
+            else:
+                raise RuntimeError(f'Unknown replay buffer strategy "{cfg_rpb.selection_strategy}"')
+
+            params  = [c for c in df_inc.columns if c not in {'accuracy', 'bopt_step', 'episodes'}]
+            update  = dict(zip(params, df_inc[params].iloc[idx_inc]))
+            new_gmm = base_agent.update_model(update, inplace=False)
+
+            episode_offset   = df_inc.episodes[idx_inc]
+            transition_count = meta_info['episode_ends'][:episode_offset][-1]
+
+            if '_gmm_' not in cfg_rpb.selection_strategy:
+                def transform_transition_processor(data) -> sac_gmm.Transition:
+                    original_action = data["action"].item().config
+                    
+                    shifted_action = shift_updates(base_agent, update, [original_action])[0]
+
+                    return sac_gmm.Transition(sacgmm_env._convert_obs(data["state"].item()),
+                                              sacgmm_env._convert_action(shifted_action),
+                                              sacgmm_env._convert_obs(data["next_state"].item()),
+                                              data["reward"].item(),
+                                              data["done"].item())
+
+                rpb.load(rp_path, data_processor=transform_transition_processor, num_transitions=transition_count)
+
+    return rpb, new_gmm, episode_offset
+
+
 def train_sacgmm(env, cfg, num_training_cycles, max_steps, 
-                 wandb, data_dir, run_id, deep_eval_length=0, ckpt_freq=10, replay_buffer_path=None):
+                 wandb, data_dir, run_id, deep_eval_length=0, ckpt_freq=10):
     logger = WBLogger('bopt-gmm', run_id, True) if wandb else BlankLogger()
     logger.log_config(cfg)
     
@@ -187,14 +217,11 @@ def train_sacgmm(env, cfg, num_training_cycles, max_steps,
 
     gmm = GMM.load_model(boptgmm_config.gmm.model)
     gmm_agent = GMMOptAgent(gmm, boptgmm_config)
-    sac_agent, sacgmm_env = build_sacgmm(env, gmm_agent, boptgmm_config.gripper_command, sacgmm_config, logger, replay_buffer_path=replay_buffer_path)
+    sac_agent, sacgmm_env, ep_count = build_sacgmm(env, gmm_agent, boptgmm_config.gripper_command, sacgmm_config, logger, replay_buffer_config=cfg.sacgmm.replay_buffer)
 
     if logger is not None:
-        for m in sac_agent.metrics:        
+        for m in sac_agent.metrics:
             logger.define_metric(m, BOPT_TIME_SCALE)
-
-    # We count all episodes, including the ones to fill replay
-    ep_count = 0
 
     if len(sac_agent.replay_buffer) < sac_agent.warm_start_steps:
         # Fill replay buffer
@@ -223,6 +250,7 @@ def train_sacgmm(env, cfg, num_training_cycles, max_steps,
     opt_steps = 0
 
     pbar = tqdm(total=total_eps) # Initialise
+    pbar.update(ep_count)  # Accomodate offset
 
     while ep_count < total_eps:
         action = sac_agent.get_action(obs_prior, 'stochastic')
@@ -266,9 +294,9 @@ def train_sacgmm(env, cfg, num_training_cycles, max_steps,
             obs_prior = sacgmm_env.reset()
             if ic_logger is not None:
                 ic = sacgmm_env.config_dict()
+            pbar.update(1)
         else:
             obs_prior = obs_post
-        pbar.update(ep_count)
     pbar.close()
 
     if data_dir is not None:
@@ -328,8 +356,7 @@ if __name__ == '__main__':
                      data_dir=args.data_dir, 
                      run_id=args.run_prefix,
                      deep_eval_length=args.deep_eval,
-                     ckpt_freq=args.ckpt_freq,
-                     replay_buffer_path=args.replay_buffer)
+                     ckpt_freq=args.ckpt_freq)
     elif args.mode == 'eval':
         if args.sac_model is None:
             print('Need "--sac-model" argument for evaluation.')

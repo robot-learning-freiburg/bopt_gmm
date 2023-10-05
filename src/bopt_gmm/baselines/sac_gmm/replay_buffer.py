@@ -92,26 +92,19 @@ class ReplayBuffer:
             return True
         return False
 
-    def load(self, path="./replay_buffer", data_processor=_default_processor):
+    def load(self, path="./replay_buffer", data_processor=_default_processor, num_transitions=None):
         if path is None:
-            return False
+            raise RuntimeError(f'Need path to replay buffer')
+
         p = Path(path)
-        if p.is_dir():
-            p = p.glob("*.npz")
-            files = [x for x in p if x.is_file()]
-            self.curr_file_idx = len(files) + 1
-            files = files[: self.replay_buffer.maxlen]
-            if len(files) > 0:
-                for file in tqdm(files, desc=f"Loading replay buffer from{path}"):
-                    data = np.load(file, allow_pickle=True)
-                    transition = data_processor(data)
-                    self.replay_buffer.append(transition)
-                self.logger.info(
-                    "Replay buffer loaded successfully %d files" % len(files)
-                )
-                return True
-            else:
-                self.logger.info("No files were found in path %s" % (path))
-        else:
-            self.logger.info("Path %s is not a directory" % (path))
-        return False
+        if not p.is_dir():
+            raise RuntimeError(f'"{path}" is not a directory.')
+
+        x = -1  # Trick to make logging work
+        for x, file in enumerate(tqdm([f for f in p.glob("*.npz") if f.is_file()][:num_transitions], desc='Loading replay buffer...')):
+            data = np.load(file, allow_pickle=True)
+            transition = data_processor(data)
+            self.replay_buffer.append(transition)
+
+        self.curr_file_idx = x + 1
+        self.logger.info(f'Replay buffer loaded successfully {self.curr_file_idx} files')

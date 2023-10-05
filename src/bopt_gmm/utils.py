@@ -12,6 +12,26 @@ from pathlib    import Path
 from subprocess import Popen
 
 
+def shift_updates(agent, update, updates):
+    new_updates = []
+    ref_gmm     = agent.update_model(update, inplace=False)
+
+    for u in updates:
+        u_new = {k: v - update[k] for k, v in u.items()}
+        
+        # Offset the post-hoc shift 
+        if agent.does_prior_update:
+            u_prior,_ = agent._decode_prior_update(u)
+            u_gmm     = agent.base_model.update_gaussian(priors=u_prior)
+            prior_delta = u_gmm.pi() - ref_gmm.pi()
+            new_prior_u = agent._encode_prior_update(prior_delta)
+            u_new.update(new_prior_u)
+        
+        new_updates.append(u_new)
+
+    return new_updates
+
+
 def gen_trajectory_from_transitions(transition_trajectories, deltaT):
     data = []
     for t in transition_trajectories:

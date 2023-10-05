@@ -7,8 +7,6 @@ init_alpha: 0.01
 batch_size: 256
 warm_start_steps: 256
 fill_strategy: 'random'
-replay_buffer_size: 100000
-replay_buffer_path: null
 optimize_alpha: true
 
 sacgmm_steps: 30      # Number of control steps per SACGMM step
@@ -28,3 +26,13 @@ critic:
   hidden_dim: 256
   init_w: 0.001
 
+replay_buffer:
+  max_size: 10000
+  load_path: null
+  selection_strategy: incumbent_num  # | steps | episodes | incumbent_gmm_limit | incumbent_limit | incumbent_gmm_num
+  incumbent_to_pick: 3               # Only for "incumbent_num" and "incumbent_gmm" strategy
+  episode_count: 100                 # Only for "episodes" strategy and "incumbent_limit"
+  step_count: 100000                 # Only for steps take
+
+observation_processors:
+  rgb_gripper: resnet18

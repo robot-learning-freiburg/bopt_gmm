@@ -199,7 +199,7 @@ def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10,
         ic_fields = env.config_space
         ic_fields += [BOPT_TIME_SCALE, 'substep', 'steps', 'success']
 
-        config_fields = [BOPT_TIME_SCALE] + list(agent.config_space.keys()) + ['accuracy']
+        config_fields = [BOPT_TIME_SCALE] + list(agent.config_space.keys()) + ['accuracy', 'episodes']
 
         # Fix location generation
         ic_logger     = CSVLogger(f'{opt_model_dir}/../bopt_initial_conditions.csv', ic_fields)
@@ -263,7 +263,8 @@ def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10,
 
             if incumbent_logger is not None and incumbent_config is not None:
                 inc_log = {BOPT_TIME_SCALE: bopt_step,
-                           'accuracy': e_acc}
+                           'accuracy': e_acc,
+                           'episodes': n_ep}
                 inc_log.update(incumbent_config)
                 incumbent_logger.log(inc_log)
 
@@ -355,7 +356,8 @@ def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10,
         if config_logger is not None:
             _, _, bopt_accuracy = ep_acc.get_stats()
             config_dict = {BOPT_TIME_SCALE: bopt_step,
-                           'accuracy': bopt_accuracy}
+                           'accuracy': bopt_accuracy,
+                           'episodes': n_ep}
             config_dict.update(bopt_config)
             config_logger.log(config_dict)
 
@@ -443,7 +445,7 @@ class ReplayBufferRecorder():
         self._replay_buffer.save(path)
         with open(path / 'rp_meta.yaml', 'w') as f:
             yaml.dump({'num_episodes': len(self._episode_ends),
-                       'episode_ends': self._episode_ends})
+                       'episode_ends': self._episode_ends}, f)
 
 
 def main_bopt_agent(env, bopt_agent_config, conf_hash, 
