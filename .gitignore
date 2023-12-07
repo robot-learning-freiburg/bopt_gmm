@@ -2,6 +2,9 @@
 **/experiments_*/
 **/wandb
 **/smac3_output
+demos_*/
+calvin_demos/*
+results
 
 *.csv
 *.png
