@@ -1,0 +1,10 @@
+defaults:
+  - env: calvin_close_drawer_env
+  - bopt@bopt_agent: bopt_gmm_base
+
+bopt_agent:
+  gmm: 
+    model: "models/gmm/calvin_close_drawer_3p.npy"
+    type: position
+    force_norm: 1
+  gripper_command: -1
