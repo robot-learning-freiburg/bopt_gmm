@@ -1,0 +1,3 @@
+python scripts/gen_gmm.py calvin_demos/demos_close_drawer/demo_00*.npz --generator em --max-iter 500 --tol-cutting 0.05 --n-priors 3 --n-init 20 --modalities position --out models/gmm/calvin_close_drawer_3p.npy
+python scripts/gen_gmm.py calvin_demos/demos_close_drawer/demo_00*.npz --generator em --max-iter 500 --tol-cutting 0.05 --n-priors 5 --n-init 20 --modalities position --out models/gmm/calvin_close_drawer_5p.npy
+python scripts/gen_gmm.py calvin_demos/demos_close_drawer/demo_00*.npz --generator em --max-iter 500 --tol-cutting 0.05 --n-priors 7 --n-init 20 --modalities position --out models/gmm/calvin_close_drawer_7p.npy

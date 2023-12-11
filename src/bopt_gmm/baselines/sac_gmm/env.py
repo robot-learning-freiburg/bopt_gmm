@@ -38,21 +38,25 @@ class ObservationProcessor:
 
 class Resnet18Processor(ObservationProcessor):
     def __init__(self, original_size=None) -> None:
-        self.wrap  = torch.nn.Sequential(*(list(resnet18(weights=ResNet18_Weights.DEFAULT).children())[:-2]))
+        self.wrap  = torch.nn.Sequential(*(list(resnet18(weights=ResNet18_Weights.DEFAULT).children())[:-2]))#.cuda()
+        # Freeze model
+        self.wrap.eval()
+
         preprocess = ResNet18_Weights.DEFAULT.transforms()
         self.mean  = np.array(preprocess.mean)
         self.std   = np.array(preprocess.std)
+        self.norm  = T.Compose([T.Resize(32, interpolation=T.functional.InterpolationMode.BILINEAR),
+                                T.Normalize(mean=self.mean, std=self.std)])
 
     def __call__(self, observation) -> Any:
         with torch.no_grad():
-            norm = T.Compose(
-                [
-                    T.Resize(32, interpolation=T.functional.InterpolationMode.BILINEAR),
-                    T.Normalize(mean=self.mean, std=self.std),
-                ]
-            )
-            o = norm(observation / 255.0)
-            return self.wrap(o)
+            if not isinstance(observation, torch.Tensor):
+                observation = torch.tensor(observation) # .cuda()
+            if observation.dim() < 4:
+                observation = observation.unsqueeze(0)
+
+            o = self.norm(observation / 255.0)
+            return self.wrap(o).cpu().squeeze()
         
     def out_space(self):
         return Box(low=np.zeros(512),

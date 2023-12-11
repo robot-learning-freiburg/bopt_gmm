@@ -1,0 +1,14 @@
+defaults:
+  - calvin@env: calvin_scene_D
+  - calvin/skill@skill: calvin_open_drawer
+
+type: calvin_open_drawer
+
+# Action frequency in Hz. Only divisors of 240 are supported.
+action_frequency: 30
+
+
+noise:
+  position:
+    variance: 0.0
+    constant: true

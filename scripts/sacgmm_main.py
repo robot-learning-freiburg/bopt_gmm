@@ -165,8 +165,11 @@ def build_replay_buffer(cfg_rpb, sacgmm_env, base_agent):
             df_inc  = pd.read_csv(rp_path.parent / 'bopt_incumbents.csv')
             if cfg_rpb.selection_strategy in {'incumbent_num', 'incumbent_gmm_num'}:
                 idx_inc = min(len(df_inc.episodes), cfg_rpb.incumbent_to_pick) - 1
+                episode_offset = df_inc.episodes[idx_inc]
             elif cfg_rpb.selection_strategy in {'incumbent_limit', 'incumbent_gmm_limit'}:
                 idx_inc = df_inc.episodes[df_inc.episodes <= cfg_rpb.episode_count].index[-1]
+                # Constant offset since we wait for this many episodes
+                episode_offset = cfg_rpb.episode_count
             else:
                 raise RuntimeError(f'Unknown replay buffer strategy "{cfg_rpb.selection_strategy}"')
 
@@ -174,7 +177,6 @@ def build_replay_buffer(cfg_rpb, sacgmm_env, base_agent):
             update  = dict(zip(params, df_inc[params].iloc[idx_inc]))
             new_gmm = base_agent.update_model(update, inplace=False)
 
-            episode_offset   = df_inc.episodes[idx_inc]
             transition_count = meta_info['episode_ends'][:episode_offset][-1]
 
             if '_gmm_' not in cfg_rpb.selection_strategy:
