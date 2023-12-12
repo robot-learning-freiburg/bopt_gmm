@@ -655,7 +655,8 @@ if __name__ == '__main__':
         gmm_path = Path(cfg.bopt_agent.gmm.model)
         gmm = GMM.load_model(cfg.bopt_agent.gmm.model)
         
-        print(f'Noise: {cfg.env.noise}')
+        if 'noise' in cfg.env:
+            print(f'Noise: {cfg.env.noise}')
 
         if args.wandb:
             run_name = f'eval_{cfg.bopt_agent.gmm.model[:-4]}'
