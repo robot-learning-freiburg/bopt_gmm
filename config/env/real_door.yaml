@@ -11,6 +11,9 @@ door_measurement_frame: obs_door_frame
 handle_safe_height: 0.35
 handle_safe_delta: 0.01
 
+static_camera: False
+image_crop: [400, 200, 500]  # X, Y, size
+
 robot:
   state_prefix: /franka_state_controller
   controllers_prefix: /controllers

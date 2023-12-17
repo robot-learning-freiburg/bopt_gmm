@@ -36,3 +36,4 @@ replay_buffer:
 
 observation_processors:
   rgb_gripper: resnet18
+  rgb_static: resnet18
