@@ -15,11 +15,13 @@ from omegaconf   import ListConfig, \
 from smac        import HyperparameterOptimizationFacade, \
                         BlackBoxFacade, \
                         HyperbandFacade, \
-                        Scenario
+                        Scenario, \
+                        MultiFidelityFacade
 from smac.runhistory.dataclasses import TrialValue, \
                                         TrialInfo
 
 from typing      import Callable, Any, Iterable, Tuple
+from pathlib     import Path
 
 import bopt_gmm.gmm as lib_gmm
 from bopt_gmm.logging import LoggerBase
@@ -257,6 +259,10 @@ def f_except(config, seed, budget):
     raise Exception('FUUU')
 
 
+
+DEFAULT_OUTPUT_PATH = Path('/tmp/smac3_output')
+
+
 class BOPTGMMAgentBase(GMMOptAgent):
     @dataclass
     class BOPTState:
@@ -328,7 +334,8 @@ class BOPTGMMAgentBase(GMMOptAgent):
 
         facade = {'hpo': HyperparameterOptimizationFacade,
                   'hb' : HyperbandFacade,
-                  'bb' : BlackBoxFacade}[self.config.acq_optimizer]
+                  'bb' : BlackBoxFacade,
+                  'mf' : MultiFidelityFacade}[self.config.acq_optimizer]
         
         try:
             intensifier = facade.get_intensifier(

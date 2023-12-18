@@ -100,7 +100,7 @@ except ModuleNotFoundError:
         def __init__(self, *args, **kwargs) -> None:
             raise NotImplementedError
 
-
+@profile
 def run_episode(env, agent, max_steps, post_step_hook=None, post_reset_hook=None, initial_conditions=None):
     observation    = env.reset(initial_conditions)
     episode_return = 0.0

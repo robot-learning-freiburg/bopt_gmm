@@ -75,7 +75,6 @@ def gen_force_logger_and_hook(force_scale=1.0):
 
     return live_plot, live_plot_hook
 
-
 def evaluate_agent(env, agent, num_episodes=100, max_steps=600, 
                    logger=None, video_dir=None, trajectory_dir=None, 
                    show_forces=False, verbose=0, initial_conditions_path=None,
@@ -683,7 +682,7 @@ if __name__ == '__main__':
                                                max_steps=cfg.bopt_agent.num_episode_steps,
                                                logger=logger,
                                                video_dir=video_dir,
-                                               show_forces=args.show_gui and not 'real' in cfg.env.type,
+                                               show_forces=False, # args.show_gui and not 'real' in cfg.env.type,
                                                verbose=1)
     
         # Restore the position of a real robot

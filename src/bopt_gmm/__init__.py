@@ -1,3 +1,14 @@
+try:
+    type(profile)
+except NameError:
+    import builtins
+
+    # Blank line profiler annotator if line profiler is not active
+    def profile(f):
+        return f
+    
+    builtins.profile = profile
+
 from . import gmm
 from . import envs
 from . import bopt

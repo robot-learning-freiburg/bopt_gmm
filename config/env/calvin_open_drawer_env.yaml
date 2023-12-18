@@ -12,3 +12,8 @@ noise:
   position:
     variance: 0.0
     constant: true
+
+env:
+  start_sampler:
+    min: [0.7, -0.05, 0]
+    max: [0.75, 0.05, 0]
