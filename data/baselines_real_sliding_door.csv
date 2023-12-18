@@ -1,0 +1,4 @@
+model,env,noise,accuracy,date
+models/gmm/real_sliding_door_3p.npy,real_sliding_door,0.0,0.7,2023-12-18 13:56:55.417695
+models/gmm/real_sliding_door_5p.npy,real_sliding_door,0.0,0.8,2023-12-18 13:42:24.708786
+models/gmm/real_sliding_door_7p.npy,real_sliding_door,0.0,0.6666666666666666,2023-12-18 13:26:58.220941
