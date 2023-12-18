@@ -1,0 +1,4 @@
+model,env,noise,accuracy,date
+models/gmm/real_door_3p.npy,real_door,0.0,0.7,2023-08-31 13:08:50.712314
+models/gmm/real_door_5p.npy,real_door,0.0,0.4333333333333333,2023-08-31 12:56:14.610700
+models/gmm/real_door_7p.npy,real_door,0.0,0.5333333333333333,2023-08-31 12:43:07.627876
