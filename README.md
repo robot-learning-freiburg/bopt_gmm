@@ -12,7 +12,7 @@ createROSWS ws
 cd src
 
 # Dependencies
-# rl_tasks
+# rl_tasks - please follow its instructions
 https://github.com/robot-learning-freiburg/rl_tasks
 
 # In case of ROS/Catkin
