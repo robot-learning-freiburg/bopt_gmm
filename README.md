@@ -12,15 +12,8 @@ createROSWS ws
 cd src
 
 # Dependencies
-# Prime Bullet
-git clone https://github.com/ARoefer/iai_bullet_sim.git
-cd iai_bullet_sim
-git checkout v0.2.0
-# If ROSVENV
-pip install -r requirements.txt
-# If plain pip/conda
-pip install -e .
-cd ..
+# rl_tasks
+https://github.com/robot-learning-freiburg/rl_tasks
 
 # In case of ROS/Catkin
 git clone https://github.com/ARoefer/roebots.git
@@ -29,9 +22,8 @@ pip install -r requirements.txt
 cd ..
 
 # Clone repository
-git clone git@rlgit.informatik.uni-freiburg.de:aroefer/bopt_gmm.git
+git clone https://github.com/robot-learning-freiburg/bopt_gmm.git
 cd bopt_gmm
-git checkout smac
 
 # If ROSVENV
 pip install -r requirements.txt
