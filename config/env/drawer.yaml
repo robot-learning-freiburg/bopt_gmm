@@ -1,0 +1,61 @@
+# Name to identify the Python type of the environment from the ENV_TYPES registry
+type: drawer
+
+# Action frequency in Hz. Only divisors of 240 are supported.
+action_frequency: 30
+
+# Angle at which the door is considered open.
+open_threshold: 0.18 # Meters
+
+# Render camera observations -- Faster without
+gripper_camera: False
+
+# Configuration of the door
+shelf:
+  # Path to the URDF file of the door
+  path: package://rl_tasks/objects/small_shelf_drawer.urdf
+  # Name of the root link
+  reference_link: body
+  # Bounds of the position sampling of the door.
+  # XYZ world coordinates in meters.
+  sampler:
+    min: [0.8, -0.07, 0.2]
+    max: [0.95, 0.07, 0.2]
+
+# Observational noise
+noise:
+  # Noise of "position" observation
+  position:
+    variance: 0.0
+    constant: true # Constant over one episode
+
+# Robot configuration
+robot:
+  # Path to the URDF file of the robot
+  path: package://rl_tasks/robots/panda_hand.urdf
+  # Name of end-effector link
+  eef: panda_hand_tcp
+  # Name of the joint measuring external wrench
+  ft_joint: panda_hand_joint
+  # Name of finger joints
+  fingers: 
+    - panda_finger_joint1
+    - panda_finger_joint2
+  # Configuration of initial pose sampler
+  initial_pose:
+    # Starting pose for IK-solver
+    q: [-0.0761568779861718, -0.24230009930803062, -0.00838963512687074, -2.6448513609067255, -0.0823553917474217, 2.7974888903564876, -2.2868770731857255] 
+    # Starting pose of robot end-effector
+    position: [0.45, 0, 0.35]
+    orientation: [-2.2, 0, -1.57]
+    # Starting gripper width
+    gripper_width: 0.0
+  # Controller used to interpret actions
+  controller: virtual   # Options: relative, virtual
+
+teleop:
+  gamepad:
+    # Cols.:  LX  LY  RX  RY  DX  DY  LT  RT   A  LB  RB  L3  R3 BIAS
+    motion: [[ 0,  0,  0,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,   0],
+             [ 0,  0,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,   0],
+             [ 0,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,   0]]

@@ -321,7 +321,10 @@ def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10,
             video_logger, video_hook = common.gen_video_logger_and_hook(video_dir, f'bopt_{bopt_step:04d}', env.render_size[:2])
             post_step_hooks.append(video_hook)
 
-        bopt_config = agent.state.current_update.config
+        if agent.state.current_update is not None:
+            bopt_config = agent.state.current_update.config
+        else:
+            bopt_config = None
 
         # Collecting data for next BOPT update
         sub_ep_idx = 0
@@ -357,7 +360,8 @@ def bopt_training(env, agent, num_episodes, max_steps=600, checkpoint_freq=10,
             config_dict = {BOPT_TIME_SCALE: bopt_step,
                            'accuracy': bopt_accuracy,
                            'episodes': n_ep}
-            config_dict.update(bopt_config)
+            if bopt_config is not None:
+                config_dict.update(bopt_config)
             config_logger.log(config_dict)
 
         if video_dir is not None:

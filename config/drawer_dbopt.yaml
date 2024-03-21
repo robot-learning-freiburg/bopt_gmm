@@ -1,0 +1,14 @@
+defaults:
+  - drawer_scenario
+  - em@bopt_agent.gmm_generator: em_3_priors
+  - override bopt@bopt_agent: bopt_gmm_dbopt
+
+bopt_agent:
+  n_successes: 12         # Number of successful trajectories to collect before generating new GMM
+  normalize_force: True   # Normalize the force measurements when generating the new GMM
+  debug_data_path: bopt_gmm_trajectories # Prefix for saving the successful trajectories used to train the GMM
+  debug_gmm_path: bopt_gmm_model         # Prefix for saving the newly generated gmm
+  base_accuracy: 0.65
+  opt_dims:
+    means: null
+    cvars: null

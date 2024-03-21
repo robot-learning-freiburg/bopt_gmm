@@ -1,0 +1,4 @@
+defaults:
+  - drawer_dbopt
+  - sacgmm@sacgmm: base
+

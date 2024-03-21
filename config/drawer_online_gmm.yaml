@@ -1,0 +1,7 @@
+defaults:
+  - drawer_scenario
+  - override bopt@bopt_agent: online_gmm
+
+bopt_agent:
+  debug_gmm_path: online_gmm_model         # Prefix for saving the newly generated gmm
+  data_path: demos_drawer/demo_*.npz

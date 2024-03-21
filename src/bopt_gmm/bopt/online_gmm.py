@@ -28,8 +28,16 @@ class OnlineGMMConfig:
     gripper_command : float = 0.5
     delta_t         : float = 0.05
     debug_gmm_path  : str   = None
+    prior_range     : float = 0.0
+    mean_range      : float = 0.0
+    sigma_range     : float = 0.0
 
 class OnlineGMMAgent(BOPTGMMAgentBase):
+    def __init__(self, base_gmm, config: BOPTAgentConfig, obs_transform=no_op, logger: LoggerBase = None) -> None:
+        super().__init__(base_gmm, config, obs_transform, logger)
+
+        self._pseudo_config = None
+
     def step(self, prior_obs, posterior_obs, action, reward, done):
         # Hacking our way past init_optimizer
         if self.state.bopt_state is None:
@@ -48,6 +56,7 @@ class OnlineGMMAgent(BOPTGMMAgentBase):
             print('Done!')
             # Increment bopt update for logging
             self.state.bopt_state.updates += 1
+            self._pseudo_config = {'n_trajectories': self.state.bopt_state.updates}
 
             if self.logger is not None:
                 self.logger.log({
@@ -58,4 +67,10 @@ class OnlineGMMAgent(BOPTGMMAgentBase):
 
         # if self.config.debug_gmm_path is not None:
         #     self.base_model.save_model(f'{self.config.debug_gmm_path}_{stamp}.npy')
+    
+    def get_incumbent(self):
+        return self.model
+
+    def get_incumbent_config(self):
+        return self._pseudo_config
 
